@@ -21,7 +21,6 @@ function showPageLog(msg) {
 }
 // ---------- FIN LOG ----------
 
-// ---- État ----
 let boardGroup, nodeObjects;
 let pieceMeshes = {};
 let state = null;
@@ -39,7 +38,7 @@ setNodeObjects(nodeObjects);
 setupInteraction(onNodeClick);
 animate();
 
-// ---- Éléments UI ----
+// ---- UI ----
 const menuOverlay = document.getElementById('menu-overlay');
 const gameContainer = document.getElementById('game-container');
 const turnIndicator = document.getElementById('turn-indicator');
@@ -49,15 +48,14 @@ const redoBtn = document.getElementById('redo-btn');
 const replayBtn = document.getElementById('replay-btn');
 const backBtn = document.getElementById('back-btn');
 
-// ---- Attendre que l'objet eel soit disponible ----
+// ---- Attente eel ----
 function waitForEel() {
-    return new Promise((resolve) => {
-        if (typeof eel !== 'undefined') {
-            resolve();
-        } else {
-            const checkInterval = setInterval(() => {
+    return new Promise(resolve => {
+        if (typeof eel !== 'undefined') resolve();
+        else {
+            const check = setInterval(() => {
                 if (typeof eel !== 'undefined') {
-                    clearInterval(checkInterval);
+                    clearInterval(check);
                     resolve();
                 }
             }, 50);
@@ -65,13 +63,11 @@ function waitForEel() {
     });
 }
 
-// ---- Initialisation de l'application après disponibilité de eel ----
 async function initApp() {
     showPageLog('Attente de l’objet eel...');
     await waitForEel();
     showPageLog('✅ Eel prêt');
 
-    // Test de connexion backend
     try {
         const testState = await eel.get_state()();
         showPageLog('🔗 Backend connecté : ' + JSON.stringify(testState));
@@ -79,7 +75,6 @@ async function initApp() {
         showPageLog('❌ Backend injoignable : ' + e.message);
     }
 
-    // Écouteurs du menu
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const mode = e.currentTarget.dataset.mode;
@@ -118,9 +113,7 @@ async function initApp() {
         if (!res.error) {
             await refreshState();
             if (needsAiTurn()) aiAutoPlay();
-        } else {
-            showPageLog('Undo error: ' + res.error);
-        }
+        } else showPageLog('Undo error: ' + res.error);
     });
 
     redoBtn.addEventListener('click', async () => {
@@ -130,9 +123,7 @@ async function initApp() {
         if (!res.error) {
             await refreshState();
             if (needsAiTurn()) aiAutoPlay();
-        } else {
-            showPageLog('Redo error: ' + res.error);
-        }
+        } else showPageLog('Redo error: ' + res.error);
     });
 
     replayBtn.addEventListener('click', async () => {
@@ -145,7 +136,9 @@ async function initApp() {
     });
 }
 
-// ---- Fonctions de jeu ----
+window.addEventListener('load', initApp);
+
+// ---- Fonctions ----
 async function refreshState() {
     try {
         state = await eel.get_state()();
@@ -177,10 +170,12 @@ function animatePieceTo(mesh, targetPos, duration = 500) {
         function step(now) {
             const elapsed = now - startTime;
             const t = Math.min(elapsed / duration, 1.0);
-            mesh.position.x = startPos.x + (targetPos.x - startPos.x) * t;
-            mesh.position.z = startPos.z + (targetPos.z - startPos.z) * t;
-            const arc = 0.5 * Math.sin(t * Math.PI);
-            mesh.position.y = startPos.y + (targetPos.y - startPos.y) * t + arc;
+            // Interpolation lissée (easeInOut)
+            const easeT = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+            mesh.position.x = startPos.x + (targetPos.x - startPos.x) * easeT;
+            mesh.position.z = startPos.z + (targetPos.z - startPos.z) * easeT;
+            const arc = 0.6 * Math.sin(easeT * Math.PI);
+            mesh.position.y = startPos.y + (targetPos.y - startPos.y) * easeT + arc;
             if (t < 1.0) {
                 requestAnimationFrame(step);
             } else {
@@ -193,32 +188,33 @@ function animatePieceTo(mesh, targetPos, duration = 500) {
 }
 
 async function updatePiecesDisplay() {
+    // Supprimer les pions disparus
     for (const idx in pieceMeshes) {
         if (state.board[idx] === null) {
             scene.remove(pieceMeshes[idx]);
             delete pieceMeshes[idx];
         }
     }
+    // Ajouter / déplacer
     for (let i = 0; i < 9; i++) {
         const player = state.board[i];
         if (!player) continue;
         const targetPos = nodeObjects[i].position.clone();
-        targetPos.y += 0.35;
+        targetPos.y += 0.18; // hauteur au-dessus du plateau
+
         if (!pieceMeshes[i]) {
             const piece = createPiece(player);
             const startX = player === 'X' ? -2.2 : 2.2;
-            piece.position.set(startX, 0.1, 0);
+            piece.position.set(startX, 0.2, 0);
             scene.add(piece);
             pieceMeshes[i] = piece;
             animating = true;
             await animatePieceTo(piece, targetPos, 600);
             animating = false;
-            showPageLog(`Pion ${player} apparu case ${i}`);
         } else if (!pieceMeshes[i].position.equals(targetPos)) {
             animating = true;
             await animatePieceTo(pieceMeshes[i], targetPos, 500);
             animating = false;
-            showPageLog(`Pion déplacé vers case ${i}`);
         }
     }
 }
@@ -266,7 +262,6 @@ async function onNodeClick(index) {
             return;
         }
         const move = index;
-        showPageLog(`Placement case ${move}`);
         const res = await eel.make_move(move)();
         if (res.error) {
             showPageLog('Erreur : ' + res.error);
@@ -285,8 +280,8 @@ async function onNodeClick(index) {
             }
             selectedPiece = index;
             if (pieceMeshes[index]) {
-                pieceMeshes[index].scale.set(1.3, 1.3, 1.3);
-                pieceMeshes[index].material.emissiveIntensity = 1.8;
+                pieceMeshes[index].scale.set(1.2, 1.2, 1.2);
+                pieceMeshes[index].material.emissiveIntensity = 1.5;
             }
             showPageLog('Pion sélectionné : ' + index);
         } else {
@@ -294,14 +289,13 @@ async function onNodeClick(index) {
             selectedPiece = null;
             if (pieceMeshes[src]) {
                 pieceMeshes[src].scale.set(1, 1, 1);
-                pieceMeshes[src].material.emissiveIntensity = 1.2;
+                pieceMeshes[src].material.emissiveIntensity = 0.5;
             }
             if (src === index) {
                 showPageLog('Annulation sélection');
                 return;
             }
             const move = [src, index];
-            showPageLog(`Mouvement ${src} → ${index}`);
             const res = await eel.make_move(move)();
             if (res.error) {
                 showPageLog('Erreur : ' + res.error);
@@ -321,8 +315,3 @@ function resetBoard() {
     selectedPiece = null;
     state = null;
 }
-
-// Lancer l'application une fois la page chargée et eel prêt
-window.addEventListener('load', () => {
-    initApp();
-});

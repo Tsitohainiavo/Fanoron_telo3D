@@ -47,10 +47,16 @@ class GameAPI:
         if self.engine.winner is not None:
             return {'error': 'Partie terminée'}
 
-        if self.mode == 'pve' and self.engine.current_player == self.ai_player:
-            return {'error': "C'est au tour de l'IA"}
+        # Si le frontend demande un coup d'IA (quel que soit le mode)
+        if move == 'ai':
+            print("[GameAPI] IA va jouer (appel direct)...")
+            return self._ai_play()
+
+        # Sinon, c'est un coup humain → vérifier les droits
         if self.mode == 'demo':
             return {'error': 'Mode démo, pas d intervention humaine'}
+        if self.mode == 'pve' and self.engine.current_player == self.ai_player:
+            return {'error': "C'est au tour de l'IA"}
 
         if isinstance(move, list):
             move = tuple(move)
@@ -58,19 +64,19 @@ class GameAPI:
         try:
             self.engine.make_move(move)
         except Exception as e:
-            print(f"[GameAPI] Erreur make_move : {e}")
             return {'error': str(e)}
 
         state = self.get_state()
+        # Si après le coup humain l'IA doit jouer, on la déclenche
         if self.engine.winner is None and self._is_ai_turn():
-            print("[GameAPI] IA va jouer...")
+            print("[GameAPI] IA va jouer après coup humain...")
             state = self._ai_play()
         return state
 
     def _is_ai_turn(self):
-        if self.mode == 'pve' and self.engine.current_player == self.ai_player:
-            return True
         if self.mode == 'demo':
+            return True
+        if self.mode == 'pve' and self.engine.current_player == self.ai_player:
             return True
         return False
 
@@ -87,16 +93,19 @@ class GameAPI:
         elif self.mode == 'demo':
             player = self.engine.current_player
             if player == 'X':
+                # IA1 : minimax moyen
                 move = minimax_move(self.engine.copy(), 4)
             else:
+                # IA2 : alphabeta difficile
                 move = alphabeta_move(self.engine.copy(), 6)
+        else:
+            return self.get_state()
 
         if move is not None:
             print(f"[GameAPI] IA joue : {move}")
             self.engine.make_move(move)
         else:
             print("[GameAPI] Aucun coup possible pour l'IA !")
-
         return self.get_state()
 
     def undo(self):
