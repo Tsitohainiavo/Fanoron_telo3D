@@ -1,33 +1,35 @@
 import eel
 from bridge.api import GameAPI
 
-# Init Eel : pointe vers le dossier qui contient index.html
+# Initialise Eel avec le dossier frontend
 eel.init('web')
 
-# Instance du backend (ton API existante, inchangée)
+# Instance du moteur
 api = GameAPI()
 
 # --- Fonctions exposées au JavaScript ---
-# Elles remplacent exactement les méthodes que tu appelais via pywebview.api
 
 @eel.expose
 def start_game(mode, difficulty=None):
+    """Lance une nouvelle partie."""
     return api.start_game(mode, difficulty)
 
 @eel.expose
 def get_state():
+    """Retourne l'état complet du jeu."""
     return api.get_state()
 
 @eel.expose
 def make_move(move):
-    """move peut être un int, une liste [src, dst], ou la chaîne 'ai'."""
+    """
+    Exécute un coup.
+    move : int (placement), [src, dst] (mouvement), ou 'ai' pour déclencher l'IA.
+    """
     if move == 'ai':
         return api._ai_play()
     else:
         return api.make_move(move)
 
-# --- Lancement ---
+# --- Lancement de l'application ---
 if __name__ == '__main__':
-    # Ouvre Chrome en mode kiosk (sans barre d'outils) avec la page locale
-    # Si tu préfères ton navigateur par défaut, remplace 'chrome' par 'default'
     eel.start('index.html', mode='chrome', port=0, size=(1280, 800))

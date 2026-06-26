@@ -4,24 +4,37 @@ import { camera } from './scene3d.js';
 
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
-let intersectionsObjects = []; // sera rempli avec les nodes
+let nodeObjects = []; // rempli depuis board.js
+let clickCallback = null;
 
 export function setupInteraction(callback) {
-  window.addEventListener('click', onClick, false);
+  clickCallback = callback;
+  window.addEventListener('click', onMouseClick);
+}
 
-  function onClick(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+function onMouseClick(event) {
+  // Ne réagit que si le conteneur du jeu est visible
+  const container = document.getElementById('game-container');
+  if (container.style.display === 'none') return;
 
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(intersectionsObjects);
-    if (intersects.length > 0) {
-      const index = intersects[0].object.userData.index;
-      callback(index);
+  // Calculer la position normalisée de la souris
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  // Vérifier les intersections avec les nœuds du plateau
+  const intersects = raycaster.intersectObjects(nodeObjects);
+  if (intersects.length > 0) {
+    const node = intersects[0].object;
+    if (node.userData.isNode) {
+      const index = node.userData.index;
+      console.log('Clic sur intersection', index);
+      if (clickCallback) clickCallback(index);
     }
   }
 }
 
-export function setIntersectionObjects(objects) {
-  intersectionsObjects = objects;
+export function setNodeObjects(nodes) {
+  nodeObjects = nodes;
 }

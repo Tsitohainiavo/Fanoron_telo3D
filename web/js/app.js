@@ -1,24 +1,31 @@
-// app.js - Orchestration, communication avec le bridge Python
-import { initScene, animate, scene, camera, controls } from './scene3d.js';
+// app.js - Orchestration, communication avec le backend Python via Eel
+import { initScene, animate, scene, camera } from './scene3d.js';
 import { createBoard, createPiece } from './board.js';
-import { setupInteraction, setIntersectionObjects } from './interactions.js';
+import { setupInteraction, setNodeObjects } from './interactions.js';
 
 // ---------- État local ----------
-let boardGroup, pieceMeshes = {};   // { index: THREE.Mesh }
+let boardGroup;
+let pieceMeshes = {};   // { index: THREE.Mesh }
 let state = null;
-let nodeObjects = [];               // pour le raycasting
 let currentMode = null;
+let selectedPieceIndex = null; // pour la phase de mouvement
 
-// ---------- Initialisation ----------
+// ---------- Initialisation de la scène ----------
 initScene();
-createGameBoard();
+boardGroup = createBoard();
+scene.add(boardGroup);
+
+// Récupérer les objets nœuds pour le raycasting
+const nodeObjects = boardGroup.children.filter(child => child.userData.isNode);
+setNodeObjects(nodeObjects);
+
 setupInteraction(handleIntersectionClick);
 animate();
 
 // ---------- Menu ----------
 document.querySelectorAll('.mode-btn').forEach(btn => {
   btn.addEventListener('click', async (e) => {
-    const mode = e.target.dataset.mode;
+    const mode = e.currentTarget.dataset.mode; // currentTarget pour éviter le select
     let difficulty = null;
     if (mode === 'pve') {
       difficulty = document.getElementById('difficulty-select').value;
@@ -26,133 +33,158 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.getElementById('menu-overlay').style.display = 'none';
     document.getElementById('game-container').style.display = 'block';
 
-    const response = await eel.start_game(mode, difficulty);
+    console.log('Démarrage mode', mode, difficulty);
+    const response = await eel.start_game(mode, difficulty)();
+    console.log('Réponse start_game', response);
     if (response.status === 'started') {
       currentMode = mode;
       await refreshState();
-      if (mode === 'demo' || (mode === 'pve' && state.current_player === 'O')) {
+      // Si l'IA doit jouer en premier (démo ou pve avec IA qui commence)
+      if ((mode === 'demo') || (mode === 'pve' && state.current_player === 'O')) {
         setTimeout(() => aiAutoPlay(), 800);
       }
     }
   });
 });
 
-document.getElementById('back-btn').addEventListener('click', () => {
+document.getElementById('back-btn').addEventListener('click', async () => {
+  // Retour au menu
   document.getElementById('menu-overlay').style.display = 'flex';
   document.getElementById('game-container').style.display = 'none';
   resetBoard();
 });
 
-// ---------- Fonctions ----------
-function createGameBoard() {
-  boardGroup = createBoard();
-  scene.add(boardGroup);
-
-  // Récupérer les nodes pour le raycasting (les enfants avec userData.index)
-  boardGroup.children.forEach(child => {
-    if (child.geometry.type === 'CylinderGeometry') {
-      // Les nodes ont une géométrie de cylindre, mais on doit filtrer ceux des lignes
-      // On ajoute un userData lors de la création. Pour simplifier, on récupère les nodes par leur matériau.
-      if (child.material.color.getHex() === 0x00ffff) { // nodes cyan
-        // Attribuer un index basé sur la position
-        const pos = child.position;
-        const x = Math.round(pos.x) + 1;
-        const z = Math.round(pos.z) + 1; // z = y dans notre grille
-        const index = z * 3 + x;  // 0-8
-        child.userData.index = index;
-        nodeObjects.push(child);
-      }
-    }
-  });
-  setIntersectionObjects(nodeObjects);
-}
-
+// ---------- Fonctions de jeu ----------
 function resetBoard() {
-  // Supprime les pions existants
+  // Supprimer les pions existants
   Object.values(pieceMeshes).forEach(mesh => scene.remove(mesh));
   pieceMeshes = {};
+  selectedPieceIndex = null;
 }
 
 async function refreshState() {
-  state = await eel.get_state();
+  state = await eel.get_state()();
+  console.log('Nouvel état', state);
   updateHUD();
   updatePiecesDisplay();
 }
 
 function updateHUD() {
-  document.getElementById('turn-indicator').querySelector('span').textContent = state.current_player;
-  const phaseText = state.phase === 'placement' ? 'Placement' : 'Mouvement';
-  document.getElementById('phase-badge').textContent = phaseText;
+  const turnSpan = document.querySelector('#turn-indicator span');
+  const phaseBadge = document.getElementById('phase-badge');
   if (state.winner) {
-    document.getElementById('turn-indicator').textContent = `Gagnant : ${state.winner}`;
+    document.getElementById('turn-indicator').innerHTML = `Gagnant : <span>${state.winner}</span>`;
+    phaseBadge.textContent = 'Terminé';
+    return;
   }
+  turnSpan.textContent = state.current_player;
+  phaseBadge.textContent = state.phase === 'placement' ? 'Placement' : 'Mouvement';
 }
 
 function updatePiecesDisplay() {
-  // Retirer les pions qui ne sont plus présents
+  // Retirer les pions qui n'existent plus
   for (const idx in pieceMeshes) {
     if (state.board[idx] === null) {
       scene.remove(pieceMeshes[idx]);
       delete pieceMeshes[idx];
     }
   }
-  // Ajouter/mettre à jour les pions
+  // Ajouter / déplacer les pions
   state.board.forEach((player, index) => {
-    if (player && !pieceMeshes[index]) {
+    if (player === null) return;
+    const pos = nodeObjects[index].position.clone();
+    pos.y += 0.35; // hauteur au-dessus de l'intersection
+
+    if (pieceMeshes[index]) {
+      // Mise à jour de la position (animation simple)
+      pieceMeshes[index].position.copy(pos);
+    } else {
       const piece = createPiece(player);
-      piece.position.copy(nodeObjects[index].position.clone().add(new THREE.Vector3(0, 0.3, 0)));
+      piece.position.copy(pos);
       scene.add(piece);
       pieceMeshes[index] = piece;
     }
   });
 }
 
+// --- Gestion des clics sur les intersections ---
 async function handleIntersectionClick(index) {
-  if (state.winner) return;
-  if (currentMode === 'demo') return;
-  if (currentMode === 'pve' && state.current_player === 'O') return; // tour IA
+  console.log('handleIntersectionClick index', index, 'mode', currentMode, 'player', state?.current_player);
+  if (!state || state.winner) return;
 
-  // Construire le move selon la phase
-  let move;
-  if (state.phase === 'placement') {
-    if (state.board[index] !== null) return; // occupé
-    move = index;
-  } else {
-    // Mouvement : sélectionner la pièce source (à implémenter plus finement : un premier clic sélectionne la pièce, deuxième clic destination)
-    // Version simplifiée : on s'attend à ce que l'humain clique d'abord sur sa pièce puis sur une destination.
-    // Ici on fait un système à deux étapes simple avec variable globale.
-    if (!window.selectedPiece) {
-      if (state.board[index] !== state.current_player) return;
-      window.selectedPiece = index;
-      highlightValidMoves(index);
-    } else {
-      const src = window.selectedPiece;
-      move = [src, index];
-      window.selectedPiece = null;
-      clearHighlights();
-    }
-    return; // on attend le deuxième clic
+  // Empêcher l'humain de jouer si c'est le tour de l'IA
+  if (currentMode === 'demo') return;
+  if (currentMode === 'pve' && state.current_player === 'O') {
+    console.log("C'est au tour de l'IA, attendez...");
+    return;
   }
 
-  const result = await eel.make_move(move);
+  // Phase de placement : simple clic
+  if (state.phase === 'placement') {
+    if (state.board[index] !== null) {
+      console.log('Case déjà occupée');
+      return;
+    }
+    const move = index;
+    console.log('Envoi coup placement', move);
+    const result = await eel.make_move(move)();
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+    await refreshState();
+    // Vérifier si l'IA doit jouer après
+    if ((currentMode === 'pve' && state.current_player === 'O') || currentMode === 'demo') {
+      setTimeout(() => aiAutoPlay(), 600);
+    }
+    return;
+  }
+
+  // Phase de mouvement : deux clics (source puis destination)
+  if (state.phase === 'mouvement') {
+    // Premier clic : sélectionner un pion du joueur courant
+    if (selectedPieceIndex === null) {
+      if (state.board[index] !== state.current_player) {
+        console.log('Ce n’est pas votre pion');
+        return;
+      }
+      selectedPieceIndex = index;
+      console.log('Pion sélectionné:', index);
+      // (On pourrait ajouter un effet visuel de surbrillance)
+      return;
+    }
+
+    // Deuxième clic : destination
+    const src = selectedPieceIndex;
+    selectedPieceIndex = null; // reset
+    const move = [src, index];
+    console.log('Envoi coup mouvement', move);
+    const result = await eel.make_move(move)();
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+    await refreshState();
+    // Tour suivant (humain ou IA)
+    if ((currentMode === 'pve' && state.current_player === 'O') || currentMode === 'demo') {
+      setTimeout(() => aiAutoPlay(), 600);
+    }
+  }
+}
+
+// --- Jeu de l'IA ---
+async function aiAutoPlay() {
+  console.log('Déclenchement IA...');
+  const result = await eel.make_move('ai')();
   if (result.error) {
-    alert(result.error);
+    console.error('Erreur IA', result.error);
     return;
   }
   await refreshState();
-  if (state.winner) return;
-
-  // Si après le coup humain, l'IA doit jouer
-  if ((currentMode === 'pve' && state.current_player === 'O') || currentMode === 'demo') {
-    setTimeout(() => aiAutoPlay(), 600);
+  // Si après le coup de l'IA la partie continue et que c'est encore à une IA (démo), on relance
+  if (!state.winner) {
+    if (currentMode === 'demo' || (currentMode === 'pve' && state.current_player === 'O')) {
+      setTimeout(() => aiAutoPlay(), 600);
+    }
   }
 }
-
-async function aiAutoPlay() {
-  const result = await eel.make_move('ai'); // l'API sait que c'est à l'IA de jouer
-  await refreshState();
-}
-
-// Gestion simplifiée des highlights (à implémenter avec un effet visuel)
-function highlightValidMoves(src) {}
-function clearHighlights() {}

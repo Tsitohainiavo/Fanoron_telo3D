@@ -19,8 +19,8 @@ export function initScene() {
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a0a);
-  scene.fog = new THREE.FogExp2(0x0a0a0a, 0.0008);
+  scene.background = new THREE.Color(0x1a1a2e); // fond sombre légèrement bleuté
+  scene.fog = new THREE.FogExp2(0x1a1a2e, 0.0005);
 
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(3.5, 5, 6);
@@ -36,21 +36,22 @@ export function initScene() {
   controls.target.set(0, 0, 0);
   controls.update();
 
-  // Post-processing (bloom)
+  // Post-processing (bloom subtil)
   composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
   const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85);
   bloomPass.threshold = 0.3;
-  bloomPass.strength = 0.8;
+  bloomPass.strength = 0.5;
   bloomPass.radius = 0.8;
   composer.addPass(bloomPass);
 
-  // Lumières
+  // Lumières chaleureuses
   const ambient = new THREE.AmbientLight(0x404066);
   scene.add(ambient);
 
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  // Lumière principale douce (simule une lumière ambiante chaude)
+  const keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
   keyLight.position.set(5, 10, 5);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.width = 1024;
@@ -59,17 +60,15 @@ export function initScene() {
   keyLight.shadow.camera.far = 50;
   scene.add(keyLight);
 
-  const fillLight = new THREE.PointLight(0x3366ff, 0.8, 15);
+  // Lumière d’appoint chaude
+  const fillLight = new THREE.PointLight(0xffaa55, 0.8, 15);
   fillLight.position.set(-4, 2, 4);
   scene.add(fillLight);
 
-  const rimLight = new THREE.PointLight(0xff3399, 0.6, 15);
+  // Léger rim light froid pour le contraste
+  const rimLight = new THREE.PointLight(0x88aaff, 0.5, 15);
   rimLight.position.set(4, 2, -4);
   scene.add(rimLight);
-
-  // Plateforme futuriste
-  const gridHelper = new THREE.PolarGridHelper(3, 32, 20, 64, 0x333355, 0x222244);
-  scene.add(gridHelper);
 
   window.addEventListener('resize', onWindowResize, false);
 }
