@@ -59,8 +59,9 @@ body { background: #0a0a0a; font-family: 'Segoe UI', sans-serif; overflow: hidde
 
 /* ---------- HUD ---------- */
 #hud {
-  position: fixed; top: 20px; left: 20px;
+  position: fixed; top: 20px; left: 20px; right: 20px;
   color: #fff; z-index: 5; display: flex; gap: 1rem; align-items: center;
+  justify-content: space-between;
 }
 .player-turn { font-size: 1.4rem; }
 .player-turn span { color: #0ff; }
@@ -70,9 +71,13 @@ body { background: #0a0a0a; font-family: 'Segoe UI', sans-serif; overflow: hidde
   padding: 0.3rem 1.2rem; border-radius: 20px;
   font-size: 0.9rem; color: #0ff;
 }
-.back-btn {
-  background: none; border: 1px solid #fff3;
+.action-btns { display: flex; gap: 0.5rem; }
+.hud-btn, .back-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
   color: #fff; padding: 0.4rem 1rem;
   border-radius: 20px; cursor: pointer;
+  font-size: 1rem; transition: 0.2s;
 }
-.back-btn:hover { background: #fff1; }
+.hud-btn:hover, .back-btn:hover { background: rgba(255,255,255,0.2); }
+.hud-btn:disabled { opacity: 0.4; cursor: default; }

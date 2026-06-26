@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Fanoron-telo 3D</title>
+
+<!-- Chargement du script de communication Eel (OBLIGATOIRE) -->
+<script type="text/javascript" src="/eel.js"></script>
+
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -25,19 +29,25 @@
       </div>
       <button class="mode-btn" data-mode="demo">🎮 Démo : IA vs IA</button>
     </div>
-    <div class="info-footer">Rotate 360° | PBR Materials | Bloom FX</div>
+    <div class="info-footer">Rotate 360° | Marbre sombre | Animations fluides</div>
   </div>
 </div>
 
-<!-- Canvas Three.js -->
+<!-- Zone de jeu -->
 <div id="game-container" style="display:none;">
   <div id="hud">
     <div class="player-turn" id="turn-indicator">Tour : <span>X</span></div>
     <div class="phase-badge" id="phase-badge">Placement</div>
+    <div class="action-btns">
+      <button id="undo-btn" class="hud-btn" title="Annuler">↩</button>
+      <button id="redo-btn" class="hud-btn" title="Rétablir">↪</button>
+      <button id="replay-btn" class="hud-btn" title="Rejouer" style="display:none;">🔄 Rejouer</button>
+    </div>
     <button id="back-btn" class="back-btn">← Menu</button>
   </div>
 </div>
 
+<!-- Importmap pour Three.js -->
 <script type="importmap">
 {
   "imports": {
@@ -47,6 +57,8 @@
 }
 </script>
 
+<!-- Notre module principal -->
 <script type="module" src="js/app.js"></script>
+
 </body>
 </html>

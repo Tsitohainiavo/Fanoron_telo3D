@@ -1,35 +1,42 @@
 import eel
 from bridge.api import GameAPI
 
-# Initialise Eel avec le dossier frontend
+# Init Eel
 eel.init('web')
 
-# Instance du moteur
 api = GameAPI()
-
-# --- Fonctions exposées au JavaScript ---
 
 @eel.expose
 def start_game(mode, difficulty=None):
-    """Lance une nouvelle partie."""
-    return api.start_game(mode, difficulty)
+    print(f"[Python] start_game appelé : mode={mode}, difficulty={difficulty}")
+    result = api.start_game(mode, difficulty)
+    print(f"[Python] start_game retourne : {result}")
+    return result
 
 @eel.expose
 def get_state():
-    """Retourne l'état complet du jeu."""
-    return api.get_state()
+    state = api.get_state()
+    print(f"[Python] get_state -> {state['current_player']}, phase={state['phase']}")
+    return state
 
 @eel.expose
 def make_move(move):
-    """
-    Exécute un coup.
-    move : int (placement), [src, dst] (mouvement), ou 'ai' pour déclencher l'IA.
-    """
-    if move == 'ai':
-        return api._ai_play()
-    else:
-        return api.make_move(move)
+    print(f"[Python] make_move appelé : move={move}")
+    result = api.make_move(move)
+    print(f"[Python] make_move retourne : {result}")
+    return result
 
-# --- Lancement de l'application ---
+@eel.expose
+def undo():
+    print("[Python] undo appelé")
+    return api.undo()
+
+@eel.expose
+def redo():
+    print("[Python] redo appelé")
+    return api.redo()
+
 if __name__ == '__main__':
+    # 'default' ouvre le navigateur par défaut (Chrome, avec F12 possible)
+    # Vous pouvez aussi forcer 'chrome' si besoin, mais 'default' est plus simple pour déboguer.
     eel.start('index.html', mode='chrome', port=0, size=(1280, 800))

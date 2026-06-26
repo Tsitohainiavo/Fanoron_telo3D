@@ -1,4 +1,3 @@
-// scene3d.js - Configuration Three.js (module)
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -15,18 +14,17 @@ export function initScene() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.0;  // baisse exposition
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a2e); // fond sombre légèrement bleuté
-  scene.fog = new THREE.FogExp2(0x1a1a2e, 0.0005);
+  scene.background = new THREE.Color(0x1a1a1a); // fond très sombre
+  scene.fog = new THREE.FogExp2(0x1a1a1a, 0.0003);
 
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(3.5, 5, 6);
+  camera.position.set(3.5, 4, 5.5);
   camera.lookAt(0, 0, 0);
 
-  // OrbitControls pour rotation 360° fluide
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
@@ -36,23 +34,23 @@ export function initScene() {
   controls.target.set(0, 0, 0);
   controls.update();
 
-  // Post-processing (bloom subtil)
+  // Post-processing : bloom très discret
   composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85);
-  bloomPass.threshold = 0.3;
-  bloomPass.strength = 0.5;
-  bloomPass.radius = 0.8;
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.2, 0.5);
+  bloomPass.threshold = 0.4;
+  bloomPass.strength = 0.3;
+  bloomPass.radius = 0.5;
   composer.addPass(bloomPass);
 
-  // Lumières chaleureuses
-  const ambient = new THREE.AmbientLight(0x404066);
+  // Lumières tamisées
+  const ambient = new THREE.AmbientLight(0x444466);
   scene.add(ambient);
 
-  // Lumière principale douce (simule une lumière ambiante chaude)
-  const keyLight = new THREE.DirectionalLight(0xffeedd, 1.2);
-  keyLight.position.set(5, 10, 5);
+  // Lumière principale douce
+  const keyLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+  keyLight.position.set(3, 6, 4);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.width = 1024;
   keyLight.shadow.mapSize.height = 1024;
@@ -60,14 +58,14 @@ export function initScene() {
   keyLight.shadow.camera.far = 50;
   scene.add(keyLight);
 
-  // Lumière d’appoint chaude
-  const fillLight = new THREE.PointLight(0xffaa55, 0.8, 15);
-  fillLight.position.set(-4, 2, 4);
+  // Remplissage chaud
+  const fillLight = new THREE.PointLight(0xffaa55, 0.4, 12);
+  fillLight.position.set(-3, 1, 3);
   scene.add(fillLight);
 
-  // Léger rim light froid pour le contraste
-  const rimLight = new THREE.PointLight(0x88aaff, 0.5, 15);
-  rimLight.position.set(4, 2, -4);
+  // Contre-jour froid très léger
+  const rimLight = new THREE.PointLight(0x99aaff, 0.3, 12);
+  rimLight.position.set(3, 1, -4);
   scene.add(rimLight);
 
   window.addEventListener('resize', onWindowResize, false);
