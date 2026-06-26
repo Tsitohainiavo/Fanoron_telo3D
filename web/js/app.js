@@ -26,7 +26,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     document.getElementById('menu-overlay').style.display = 'none';
     document.getElementById('game-container').style.display = 'block';
 
-    const response = await pywebview.api.start_game(mode, difficulty);
+    const response = await eel.start_game(mode, difficulty);
     if (response.status === 'started') {
       currentMode = mode;
       await refreshState();
@@ -74,7 +74,7 @@ function resetBoard() {
 }
 
 async function refreshState() {
-  state = await pywebview.api.get_state();
+  state = await eel.get_state();
   updateHUD();
   updatePiecesDisplay();
 }
@@ -134,7 +134,7 @@ async function handleIntersectionClick(index) {
     return; // on attend le deuxième clic
   }
 
-  const result = await pywebview.api.make_move(move);
+  const result = await eel.make_move(move);
   if (result.error) {
     alert(result.error);
     return;
@@ -149,7 +149,7 @@ async function handleIntersectionClick(index) {
 }
 
 async function aiAutoPlay() {
-  const result = await pywebview.api.make_move('ai'); // l'API sait que c'est à l'IA de jouer
+  const result = await eel.make_move('ai'); // l'API sait que c'est à l'IA de jouer
   await refreshState();
 }
 
