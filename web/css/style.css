@@ -1,0 +1,78 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+/* ---------- Menu ---------- */
+#menu-overlay {
+  position: fixed; top:0; left:0; width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0a 70%);
+  z-index: 10;
+}
+.menu-card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 3rem 4rem;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 80px rgba(0,255,255,0.15);
+}
+.game-title {
+  font-size: 3.5rem; font-weight: 700;
+  color: #fff; letter-spacing: 2px;
+}
+.game-title span { color: #00ffff; }
+.subtitle {
+  color: #aaa; margin: 0.5rem 0 2rem;
+  font-size: 1.2rem; letter-spacing: 3px;
+}
+.mode-btn {
+  display: block; width: 100%;
+  margin: 0.8rem 0;
+  padding: 1rem;
+  font-size: 1.2rem;
+  background: rgba(0,255,255,0.1);
+  border: 1px solid rgba(0,255,255,0.3);
+  color: #fff; border-radius: 12px;
+  cursor: pointer; transition: all 0.3s;
+}
+.mode-btn:hover {
+  background: rgba(0,255,255,0.25);
+  box-shadow: 0 0 25px rgba(0,255,255,0.4);
+  transform: translateY(-2px);
+}
+.pve-group {
+  display: flex; gap: 0.8rem;
+}
+.pve-group .mode-btn { flex: 2; }
+.difficulty-select {
+  flex: 1; padding: 0.5rem;
+  font-size: 1rem;
+  background: #111; color: #0ff;
+  border: 1px solid #0ff; border-radius: 12px;
+  cursor: pointer;
+}
+.info-footer {
+  margin-top: 2rem; color: #555;
+  font-size: 0.8rem; letter-spacing: 2px;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed; top: 20px; left: 20px;
+  color: #fff; z-index: 5; display: flex; gap: 1rem; align-items: center;
+}
+.player-turn { font-size: 1.4rem; }
+.player-turn span { color: #0ff; }
+.phase-badge {
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  padding: 0.3rem 1.2rem; border-radius: 20px;
+  font-size: 0.9rem; color: #0ff;
+}
+.back-btn {
+  background: none; border: 1px solid #fff3;
+  color: #fff; padding: 0.4rem 1rem;
+  border-radius: 20px; cursor: pointer;
+}
+.back-btn:hover { background: #fff1; }

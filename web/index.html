@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Fanoron-telo 3D</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Menu principal -->
+<div id="menu-overlay">
+  <div class="menu-card">
+    <h1 class="game-title">FANORON<span>-TELO</span></h1>
+    <div class="subtitle">Expérience immersive 3D</div>
+    <div class="mode-select">
+      <button class="mode-btn" data-mode="pvp">👥 Humain vs Humain</button>
+      <div class="pve-group">
+        <button class="mode-btn" data-mode="pve">🤖 Humain vs IA</button>
+        <select id="difficulty-select" class="difficulty-select">
+          <option value="easy">Facile</option>
+          <option value="medium" selected>Moyen</option>
+          <option value="hard">Difficile</option>
+        </select>
+      </div>
+      <button class="mode-btn" data-mode="demo">🎮 Démo : IA vs IA</button>
+    </div>
+    <div class="info-footer">Rotate 360° | PBR Materials | Bloom FX</div>
+  </div>
+</div>
+
+<!-- Canvas Three.js -->
+<div id="game-container" style="display:none;">
+  <div id="hud">
+    <div class="player-turn" id="turn-indicator">Tour : <span>X</span></div>
+    <div class="phase-badge" id="phase-badge">Placement</div>
+    <button id="back-btn" class="back-btn">← Menu</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
