@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { PLANK_THICKNESS } from './board.js';
 
 /* ------------------------------------------------------------------ *
- * Textures procédurales (canvas), dans le même esprit que la texture
- * marbre de board.js : pas de fichier externe à charger.
+ * Textures procédurales
  * ------------------------------------------------------------------ */
-
 function createWoodTexture(baseColor = '#3b2113', grainColor = '#190f06', size = 512) {
     const canvas = document.createElement('canvas');
     canvas.width = size; canvas.height = size;
@@ -57,9 +55,8 @@ function createFloorTexture() {
 }
 
 /* ------------------------------------------------------------------ *
- * Petits éléments réutilisables
+ * Appliques murales
  * ------------------------------------------------------------------ */
-
 function createSconce(scene, x, z, y = 3.2) {
     const group = new THREE.Group();
     const baseMat = new THREE.MeshStandardMaterial({ color: 0xc9a24b, roughness: 0.3, metalness: 0.75 });
@@ -80,12 +77,10 @@ function createSconce(scene, x, z, y = 3.2) {
 }
 
 /* ------------------------------------------------------------------ *
- * Pièce complète : sol, tapis, murs, fenêtre, tableau, appliques, table
+ * Pièce complète
  * ------------------------------------------------------------------ */
-
 export function createRoom() {
     const room = new THREE.Group();
-
     const FLOOR_Y = -1.35;
 
     // ----- Sol -----
@@ -96,34 +91,30 @@ export function createRoom() {
     floor.receiveShadow = true;
     room.add(floor);
 
-    // ----- Tapis rond sous la table -----
+    // ----- Tapis (élargi) -----
     const rugMat = new THREE.MeshStandardMaterial({ color: 0x5c1f1f, roughness: 0.95, metalness: 0 });
-    const rug = new THREE.Mesh(new THREE.CircleGeometry(3.3, 48), rugMat);
+    const rug = new THREE.Mesh(new THREE.CircleGeometry(4.0, 48), rugMat);
     rug.rotation.x = -Math.PI / 2;
     rug.position.y = FLOOR_Y + 0.005;
     rug.receiveShadow = true;
     room.add(rug);
-    // Bordure dorée du tapis
     const rugTrimMat = new THREE.MeshStandardMaterial({ color: 0xb8923f, roughness: 0.4, metalness: 0.6 });
-    const rugTrim = new THREE.Mesh(new THREE.RingGeometry(3.25, 3.32, 64), rugTrimMat);
+    const rugTrim = new THREE.Mesh(new THREE.RingGeometry(3.95, 4.02, 64), rugTrimMat);
     rugTrim.rotation.x = -Math.PI / 2;
     rugTrim.position.y = FLOOR_Y + 0.006;
     room.add(rugTrim);
 
-    // ----- Murs -----
+    // ----- Murs (inchangés) -----
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x1c1622, roughness: 0.88, metalness: 0.04 });
     const wallBack = new THREE.Mesh(new THREE.PlaneGeometry(26, 10), wallMat);
     wallBack.position.set(0, FLOOR_Y + 5, -9);
     wallBack.receiveShadow = true;
     room.add(wallBack);
-
     const wallSide = new THREE.Mesh(new THREE.PlaneGeometry(26, 10), wallMat);
     wallSide.rotation.y = Math.PI / 2;
     wallSide.position.set(-9, FLOOR_Y + 5, 0);
     wallSide.receiveShadow = true;
     room.add(wallSide);
-
-    // Plinthes dorées
     const trimMat = new THREE.MeshStandardMaterial({ color: 0xc9a24b, roughness: 0.35, metalness: 0.7 });
     const trimBack = new THREE.Mesh(new THREE.BoxGeometry(26, 0.22, 0.06), trimMat);
     trimBack.position.set(0, FLOOR_Y + 0.11, -8.96);
@@ -132,7 +123,7 @@ export function createRoom() {
     trimSide.position.set(-8.96, FLOOR_Y + 0.11, 0);
     room.add(trimSide);
 
-    // ----- Fenêtre lumineuse (mur du fond) -----
+    // ----- Fenêtre et tableau (inchangés) -----
     const windowGroup = new THREE.Group();
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a3318, roughness: 0.5, metalness: 0.35 });
     const glowMat = new THREE.MeshStandardMaterial({
@@ -141,7 +132,6 @@ export function createRoom() {
     const frame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.4, 0.12), frameMat);
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 3.0), glowMat);
     glow.position.z = 0.07;
-    // croisillons
     const muntinMat = frameMat;
     const muntinV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 3.0, 0.1), muntinMat);
     muntinV.position.z = 0.08;
@@ -150,12 +140,10 @@ export function createRoom() {
     windowGroup.add(frame, glow, muntinV, muntinH);
     windowGroup.position.set(4.6, FLOOR_Y + 5.3, -8.88);
     room.add(windowGroup);
-
     const moonLight = new THREE.PointLight(0x8fb0ff, 0.6, 16);
     moonLight.position.set(4.6, FLOOR_Y + 5.3, -7.2);
     room.add(moonLight);
 
-    // ----- Tableau décoratif au mur -----
     const paintingGroup = new THREE.Group();
     const paintFrameMat = new THREE.MeshStandardMaterial({ color: 0x7a5a2a, roughness: 0.4, metalness: 0.55 });
     const paintCanvasMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.85 });
@@ -166,58 +154,57 @@ export function createRoom() {
     paintingGroup.position.set(-5.4, FLOOR_Y + 5.5, -8.88);
     room.add(paintingGroup);
 
-    // ----- Appliques murales -----
     room.add(createSconce(room, -3, -8.8, FLOOR_Y + 4.5));
     room.add(createSconce(room, 3, -8.8, FLOOR_Y + 4.5));
 
     // ----------------------------------------------------------------
-    // Table : le dessus affleure EXACTEMENT le dessous du plateau de jeu
-    // (qui se trouve à y = -PLANK_THICKNESS, cf. board.js), pour que le
-    // plateau soit posé sur la table et non flottant au-dessus.
+    // Table ÉLARGIE pour accueillir les pions de réserve (x jusqu'à ±2.4)
     // ----------------------------------------------------------------
     const TABLE_TOP_THICKNESS = 0.12;
-    const tableTopY = -PLANK_THICKNESS - TABLE_TOP_THICKNESS / 2;
+    const tableTopY = -PLANK_THICKNESS - TABLE_TOP_THICKNESS / 2; // -0.21
 
     const woodMat = new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.35, metalness: 0.18 });
-    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(3.8, TABLE_TOP_THICKNESS, 3.8), woodMat);
+    // Largeur augmentée à 5.8 (de -2.9 à 2.9)
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(5.8, TABLE_TOP_THICKNESS, 3.8), woodMat);
     tableTop.position.y = tableTopY;
     tableTop.castShadow = true;
     tableTop.receiveShadow = true;
     room.add(tableTop);
 
-    // Moulure de bord (assise visuelle, évite l'effet "boîte qui flotte")
+    // Moulure de bord
     const edgeMat = new THREE.MeshStandardMaterial({ color: 0x1a0d06, roughness: 0.4, metalness: 0.3 });
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(3.92, 0.05, 3.92), edgeMat);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(5.92, 0.05, 3.92), edgeMat);
     edge.position.y = tableTopY - TABLE_TOP_THICKNESS / 2 - 0.025;
     edge.castShadow = true;
     room.add(edge);
 
-    // Pieds de table
+    // Pieds de table (recalculés pour la largeur)
     const legTopY = tableTopY - TABLE_TOP_THICKNESS / 2 - 0.05;
     const legHeight = legTopY - FLOOR_Y;
     const legMat = new THREE.MeshStandardMaterial({ color: 0x2a160a, roughness: 0.5, metalness: 0.2 });
     const legGeo = new THREE.CylinderGeometry(0.09, 0.12, legHeight, 12);
-    const legOffset = 1.65;
+    const legOffsetX = 2.6; // légèrement plus écartés
+    const legOffsetZ = 1.65;
     const legPositions = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
     legPositions.forEach(([sx, sz]) => {
         const leg = new THREE.Mesh(legGeo, legMat);
-        leg.position.set(sx * legOffset, FLOOR_Y + legHeight / 2, sz * legOffset);
+        leg.position.set(sx * legOffsetX, FLOOR_Y + legHeight / 2, sz * legOffsetZ);
         leg.castShadow = true;
         leg.receiveShadow = true;
         room.add(leg);
     });
 
-    // Traverses entre les pieds (renfort esthétique, façon vraie table en bois)
-    const braceGeo = new THREE.BoxGeometry(0.06, 0.06, legOffset * 2 - 0.3);
+    // Traverses
+    const braceGeo = new THREE.BoxGeometry(0.06, 0.06, legOffsetZ * 2 - 0.3);
     [-1, 1].forEach(sx => {
         const brace = new THREE.Mesh(braceGeo, legMat);
-        brace.position.set(sx * legOffset, FLOOR_Y + legHeight * 0.22, 0);
+        brace.position.set(sx * legOffsetX, FLOOR_Y + legHeight * 0.22, 0);
         room.add(brace);
     });
-    const braceGeo2 = new THREE.BoxGeometry(legOffset * 2 - 0.3, 0.06, 0.06);
+    const braceGeo2 = new THREE.BoxGeometry(legOffsetX * 2 - 0.3, 0.06, 0.06);
     [-1, 1].forEach(sz => {
         const brace = new THREE.Mesh(braceGeo2, legMat);
-        brace.position.set(0, FLOOR_Y + legHeight * 0.22, sz * legOffset);
+        brace.position.set(0, FLOOR_Y + legHeight * 0.22, sz * legOffsetZ);
         room.add(brace);
     });
 

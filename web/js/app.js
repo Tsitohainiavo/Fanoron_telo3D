@@ -1,20 +1,23 @@
-import { initScene, animate, scene } from './scene3d.js';
-import { createBoard, createPiece, PLANK_THICKNESS, PIECE_REST_Y, SIDE_POSITIONS, createSideStands } from './board.js';
+import { initScene, animate, scene, camera, controls } from './scene3d.js';
+import {
+    createBoard, createPiece, PLANK_THICKNESS, PIECE_REST_Y, SIDE_POSITIONS, WINNING_LINES, createWinLine
+} from './board.js';
 import { createRoom } from './room.js';
 import { setupInteraction, setNodeObjects } from './interactions.js';
 import { Sound } from './sounds.js';
 
 // ---- État global ----
 let boardGroup, nodeObjects;
-let pieceOnBoard = {};           // index -> mesh (pions sur le plateau)
-let sidePieces = { X: [], O: [] }; // mesh des pions de côté (toujours 3 chacun)
+let pieceOnBoard = {};           // index -> mesh
+let sidePieces = { X: [], O: [] };
 let state = null;
 let currentMode = null;
-let selectedPiece = null;        // { type: 'side'|'board', index?, player?, mesh }
+let selectedPiece = null;
 let animating = false;
 let validMoves = [];
+let winLine = null;
 
-// Éléments d'interface
+// UI
 const menuOverlay = document.getElementById('menu-overlay');
 const gameContainer = document.getElementById('game-container');
 const turnIndicator = document.getElementById('turn-indicator');
@@ -26,6 +29,7 @@ const backBtn = document.getElementById('back-btn');
 const turnMessage = document.getElementById('turn-message');
 const victoryOverlay = document.getElementById('victory-overlay');
 const victoryText = document.getElementById('victory-text');
+const observeBtn = document.getElementById('observe-btn');
 const newGameBtn = document.getElementById('new-game-btn');
 
 // ---- Initialisation scène ----
@@ -35,11 +39,7 @@ boardGroup = createBoard();
 scene.add(boardGroup);
 nodeObjects = boardGroup.children.filter(c => c.userData.isNode);
 
-// Supports latéraux
-const sideStands = createSideStands();
-scene.add(sideStands);
-
-// Création des 6 pions de côté (3 par joueur)
+// Création des 6 pions de côté
 for (const player of ['X', 'O']) {
     for (let i = 0; i < 3; i++) {
         const piece = createPiece(player);
@@ -50,10 +50,14 @@ for (const player of ['X', 'O']) {
     }
 }
 
-// Objets interactifs : nœuds du plateau + pions de côté
+// Liste interactive (inclut les hitbox des pions de côté)
 let allInteractive = [...nodeObjects];
 function updateInteractiveList() {
-    allInteractive = [...nodeObjects, ...sidePieces.X.filter(p => p.visible), ...sidePieces.O.filter(p => p.visible)];
+    allInteractive = [
+        ...nodeObjects,
+        ...sidePieces.X.filter(p => p.visible),
+        ...sidePieces.O.filter(p => p.visible)
+    ];
     setNodeObjects(allInteractive);
 }
 updateInteractiveList();
@@ -61,7 +65,7 @@ updateInteractiveList();
 setupInteraction(onClick, onHover);
 animate();
 
-// ---- Attente eel ----
+// ---- Attente Eel ----
 function waitForEel() {
     return new Promise(resolve => {
         if (typeof eel !== 'undefined') resolve();
@@ -95,7 +99,7 @@ async function initApp() {
                     menuOverlay.style.display = 'flex';
                 }
             } catch (err) {
-                alert('Erreur de connexion');
+                alert('Erreur de connexion au serveur');
                 menuOverlay.style.display = 'flex';
             }
         });
@@ -105,12 +109,24 @@ async function initApp() {
         menuOverlay.style.display = 'flex';
         gameContainer.style.display = 'none';
         victoryOverlay.style.display = 'none';
+        removeWinLine();
         resetAll();
     });
-    undoBtn.addEventListener('click', async () => { if (!animating) { await eel.undo()(); await refreshState(); if (needsAiTurn()) aiAutoPlay(); } });
-    redoBtn.addEventListener('click', async () => { if (!animating) { await eel.redo()(); await refreshState(); if (needsAiTurn()) aiAutoPlay(); } });
+    undoBtn.addEventListener('click', async () => {
+        if (animating) return;
+        await eel.undo()();
+        await refreshState();
+        if (needsAiTurn()) aiAutoPlay();
+    });
+    redoBtn.addEventListener('click', async () => {
+        if (animating) return;
+        await eel.redo()();
+        await refreshState();
+        if (needsAiTurn()) aiAutoPlay();
+    });
     replayBtn.addEventListener('click', async () => {
         victoryOverlay.style.display = 'none';
+        removeWinLine();
         const diff = document.getElementById('difficulty-select')?.value;
         await eel.start_game(currentMode, diff)();
         resetGameVisuals();
@@ -119,30 +135,71 @@ async function initApp() {
     });
     newGameBtn.addEventListener('click', async () => {
         victoryOverlay.style.display = 'none';
+        removeWinLine();
         menuOverlay.style.display = 'flex';
         gameContainer.style.display = 'none';
         resetAll();
     });
+    observeBtn.addEventListener('click', () => {
+        victoryOverlay.style.display = 'none';
+    });
 }
 window.addEventListener('load', initApp);
 
-// ---- Interaction ----
-function onHover(obj) {
-    // Surbrillance des cases survolées (optionnel, non requis mais peut rester)
+// ---- Caméra contextuelle ----
+const cameraTargets = {
+    X: { pos: new THREE.Vector3(-3.5, 2.8, 0), lookAt: new THREE.Vector3(-1.5, 0, 0) },
+    O: { pos: new THREE.Vector3(3.5, 2.8, 0), lookAt: new THREE.Vector3(1.5, 0, 0) }
+};
+
+function animateCamera(targetPos, targetLookAt, duration = 800) {
+    return new Promise(resolve => {
+        const startPos = camera.position.clone();
+        const startTarget = controls.target.clone();
+        const startTime = performance.now();
+        controls.enabled = false;
+        function step(now) {
+            const t = Math.min((now - startTime) / duration, 1.0);
+            const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
+            camera.position.lerpVectors(startPos, targetPos, ease);
+            controls.target.lerpVectors(startTarget, targetLookAt, ease);
+            if (t < 1.0) {
+                requestAnimationFrame(step);
+            } else {
+                camera.position.copy(targetPos);
+                controls.target.copy(targetLookAt);
+                controls.enabled = true;
+                resolve();
+            }
+        }
+        requestAnimationFrame(step);
+    });
 }
+
+async function moveCameraForPlayer(player) {
+    if (!player) return;
+    const target = cameraTargets[player];
+    await animateCamera(target.pos, target.lookAt);
+}
+
+// ---- Interaction (clics / survol) ----
+function onHover(obj) { /* optionnel */ }
 
 function onClick(obj) {
     if (!state || state.winner || animating) return;
     if (currentMode === 'demo') return;
     if (currentMode === 'pve' && state.current_player === 'O') return;
 
-    // Clic sur un pion de côté (phase placement uniquement)
+    // Si on a cliqué sur un enfant (hitbox), remonter au parent pion
+    if (obj && obj.parent && obj.parent.userData.isSidePiece) {
+        obj = obj.parent;
+    }
+
+    // Pion de réserve
     if (obj && obj.userData.isSidePiece) {
         if (state.phase !== 'placement') return;
         if (obj.userData.player !== state.current_player) return;
-        // Sélectionne ce pion
         if (selectedPiece && selectedPiece.mesh === obj) {
-            // Désélection
             selectedPiece = null;
             updateHighlights();
             return;
@@ -153,11 +210,10 @@ function onClick(obj) {
         return;
     }
 
-    // Clic sur une case du plateau
+    // Case du plateau
     if (obj && obj.userData.isNode) {
         const index = obj.userData.index;
 
-        // Phase placement avec un pion de côté sélectionné
         if (state.phase === 'placement' && selectedPiece && selectedPiece.type === 'side') {
             if (!validMoves.includes(index)) return;
             const player = selectedPiece.player;
@@ -167,10 +223,8 @@ function onClick(obj) {
             return;
         }
 
-        // Phase mouvement : sélection d'un pion sur le plateau
         if (state.phase === 'mouvement') {
             if (selectedPiece === null || selectedPiece.type === 'side') {
-                // Sélection d'un pion du joueur
                 if (state.board[index] !== state.current_player) return;
                 if (!pieceOnBoard[index]) return;
                 selectedPiece = { type: 'board', index, mesh: pieceOnBoard[index] };
@@ -179,20 +233,18 @@ function onClick(obj) {
                 Sound.pickUp();
                 updateHighlights();
             } else if (selectedPiece.type === 'board') {
-                // Destination
                 const src = selectedPiece.index;
                 const mesh = selectedPiece.mesh;
                 selectedPiece = null;
-                mesh.scale.set(1, 1, 1);
+                mesh.scale.set(1,1,1);
                 mesh.material.emissiveIntensity = 0.5;
                 if (src === index) { updateHighlights(); return; }
-                const moveValid = validMoves.some(m => Array.isArray(m) && m[0] === src && m[1] === index);
-                if (!moveValid) return;
+                const isValid = validMoves.some(m => Array.isArray(m) && m[0]===src && m[1]===index);
+                if (!isValid) return;
                 executeMove(mesh, src, index);
             }
         }
     } else {
-        // Clic hors zone : désélection
         if (selectedPiece) {
             if (selectedPiece.type === 'board') {
                 selectedPiece.mesh.scale.set(1,1,1);
@@ -204,7 +256,7 @@ function onClick(obj) {
     }
 }
 
-// ---- Mise à jour des lumières ----
+// ---- Surbrillances ----
 function updateHighlights() {
     nodeObjects.forEach(n => { if (n.userData.highlight) n.userData.highlight.visible = false; });
     if (!state || state.winner) return;
@@ -224,25 +276,23 @@ function updateHighlights() {
     }
 }
 
-// ---- Animations ----
+// ---- Animation de déplacement ----
 function animateMove(mesh, startPos, endPos, duration = 900) {
     return new Promise(resolve => {
         const startTime = performance.now();
         const startRot = mesh.rotation.y;
-        const totalRot = Math.PI * 2; // tour complet pour effet roulement
+        const totalRot = Math.PI * 2;
         function step(now) {
             const t = Math.min((now - startTime) / duration, 1.0);
             const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
             mesh.position.lerpVectors(startPos, endPos, ease);
-            // Arc discret
             mesh.position.y = startPos.y + (endPos.y - startPos.y) * ease + 0.25 * Math.sin(ease * Math.PI);
-            // Rotation roulement
             mesh.rotation.y = startRot + totalRot * ease;
             if (t < 1.0) {
                 requestAnimationFrame(step);
             } else {
                 mesh.position.copy(endPos);
-                mesh.rotation.y = startRot; // on remet l'orientation aléatoire initiale
+                mesh.rotation.y = startRot;
                 resolve();
             }
         }
@@ -254,17 +304,13 @@ async function executePlacement(player, mesh, targetIndex) {
     if (animating) return;
     animating = true;
     const res = await eel.make_move(targetIndex)();
-    if (res.error) {
-        animating = false;
-        return;
-    }
+    if (res.error) { animating = false; return; }
     Sound.place();
+
     const targetNode = nodeObjects.find(n => n.userData.index === targetIndex);
-    const endPos = targetNode.position.clone();
-    endPos.y = PIECE_REST_Y;
+    const endPos = targetNode.position.clone(); endPos.y = PIECE_REST_Y;
     const startPos = mesh.position.clone();
 
-    // Retirer le pion de la liste des pions de côté
     const arr = sidePieces[player];
     const idx = arr.indexOf(mesh);
     if (idx > -1) arr.splice(idx, 1);
@@ -283,11 +329,9 @@ async function executeMove(mesh, src, dst) {
     if (animating) return;
     animating = true;
     const res = await eel.make_move([src, dst])();
-    if (res.error) {
-        animating = false;
-        return;
-    }
+    if (res.error) { animating = false; return; }
     Sound.move();
+
     const startNode = nodeObjects.find(n => n.userData.index === src);
     const endNode = nodeObjects.find(n => n.userData.index === dst);
     const startPos = startNode.position.clone(); startPos.y = PIECE_REST_Y;
@@ -301,14 +345,20 @@ async function executeMove(mesh, src, dst) {
     if (needsAiTurn()) aiAutoPlay();
 }
 
-// ---- Synchronisation avec l'état ----
+// ---- Synchronisation état logique / visuel ----
+let previousBoard = null;
+
 async function refreshState() {
     try {
+        previousBoard = state ? [...state.board] : null;
         state = await eel.get_state()();
         validMoves = state.valid_moves || [];
         updateHUD();
         await syncPiecesWithState();
         updateHighlights();
+        if (!state.winner && state.current_player) {
+            moveCameraForPlayer(state.current_player);
+        }
         checkVictory();
     } catch (e) { console.error(e); }
 }
@@ -317,7 +367,8 @@ function updateHUD() {
     if (!state) return;
     const colorName = state.current_player === 'X' ? 'Bronze' : 'Argent';
     if (state.winner) {
-        turnIndicator.innerHTML = `Gagnant : <span>${state.winner === 'X' ? 'Bronze' : 'Argent'}</span>`;
+        const winnerName = state.winner === 'X' ? 'Bronze' : 'Argent';
+        turnIndicator.innerHTML = `Gagnant : <span>${winnerName}</span>`;
         phaseBadge.textContent = 'Terminé';
         replayBtn.style.display = 'inline-block';
         turnMessage.style.opacity = 0;
@@ -345,12 +396,9 @@ function needsAiTurn() {
     return false;
 }
 
-// Aligne les pions physiques avec l'état logique
 async function syncPiecesWithState() {
-    // 1. Retirer les pions du plateau qui ne sont plus dans l'état
     for (const idx in pieceOnBoard) {
         if (state.board[idx] === null) {
-            // Le pion n'est plus là : on le renvoie dans la réserve
             const mesh = pieceOnBoard[idx];
             const player = mesh.userData.player;
             if (!sidePieces[player].includes(mesh)) {
@@ -360,12 +408,9 @@ async function syncPiecesWithState() {
             delete pieceOnBoard[idx];
         }
     }
-
-    // 2. Placer les pions manquants sur le plateau
     for (let i = 0; i < 9; i++) {
         const player = state.board[i];
         if (player && !pieceOnBoard[i]) {
-            // Chercher un pion de réserve de ce joueur
             const arr = sidePieces[player];
             if (arr.length > 0) {
                 const mesh = arr.shift();
@@ -375,7 +420,6 @@ async function syncPiecesWithState() {
                 mesh.position.copy(pos);
                 pieceOnBoard[i] = mesh;
             } else {
-                // Cas extrême : créer un nouveau pion (ne devrait pas arriver)
                 const mesh = createPiece(player);
                 mesh.position.copy(nodeObjects[i].position);
                 mesh.position.y = PIECE_REST_Y;
@@ -384,23 +428,18 @@ async function syncPiecesWithState() {
             }
         }
     }
-
-    // 3. Positionner les pions de réserve sur leurs emplacements
     for (const player of ['X', 'O']) {
         const positions = SIDE_POSITIONS[player];
-        const pieces = sidePieces[player];
-        pieces.forEach((mesh, i) => {
+        sidePieces[player].forEach((mesh, i) => {
             if (i < positions.length) {
                 mesh.position.copy(positions[i]);
                 mesh.visible = true;
             } else {
-                mesh.visible = false; // sécurité
+                mesh.visible = false;
             }
         });
     }
-
     updateInteractiveList();
-    // Si le pion sélectionné a été retiré (undo), on désélectionne
     if (selectedPiece && selectedPiece.type === 'board' && !pieceOnBoard[selectedPiece.index]) {
         selectedPiece = null;
     }
@@ -410,12 +449,32 @@ async function syncPiecesWithState() {
 }
 
 function checkVictory() {
-    if (state && state.winner) {
-        const winnerName = state.winner === 'X' ? 'Bronze' : 'Argent';
-        victoryText.textContent = `Victoire du joueur ${winnerName} !`;
-        victoryOverlay.style.display = 'flex';
-        Sound.victory();
-        spawnConfetti();
+    if (state && state.winner && !winLine) {
+        const player = state.winner;
+        const board = state.board;
+        const line = WINNING_LINES.find(l =>
+            board[l[0]] === player && board[l[1]] === player && board[l[2]] === player
+        );
+        if (line) {
+            const p1 = nodeObjects[line[0]].position.clone(); p1.y = 0.05;
+            const p2 = nodeObjects[line[2]].position.clone(); p2.y = 0.05;
+            winLine = createWinLine(p1, p2);
+            scene.add(winLine);
+            Sound.victory();
+            spawnConfetti();
+            setTimeout(() => {
+                const winnerName = player === 'X' ? 'Bronze' : 'Argent';
+                victoryText.textContent = `Victoire du joueur ${winnerName} !`;
+                victoryOverlay.style.display = 'flex';
+            }, 2000);
+        }
+    }
+}
+
+function removeWinLine() {
+    if (winLine) {
+        scene.remove(winLine);
+        winLine = null;
     }
 }
 
@@ -444,16 +503,84 @@ function spawnConfetti() {
     requestAnimationFrame(anim);
 }
 
+// ---- IA avec animation ----
 async function aiAutoPlay() {
     if (animating) return;
-    const res = await eel.make_move('ai')();
+    const oldBoard = state ? [...state.board] : null;
+    let res;
+    try {
+        res = await eel.make_move('ai')();
+    } catch (e) {
+        console.error('Erreur IA :', e);
+        return;
+    }
     if (res.error) return;
+
+    const newState = await eel.get_state()();
+    const newBoard = newState.board;
+    let move = null;
+    if (oldBoard) {
+        for (let i = 0; i < 9; i++) {
+            if (!oldBoard[i] && newBoard[i]) {
+                move = { type: 'place', index: i, player: newBoard[i] };
+                break;
+            }
+        }
+        if (!move) {
+            for (let i = 0; i < 9; i++) {
+                if (oldBoard[i] && !newBoard[i]) {
+                    const src = i;
+                    const player = oldBoard[i];
+                    for (let j = 0; j < 9; j++) {
+                        if (!oldBoard[j] && newBoard[j] === player) {
+                            move = { type: 'move', src, dst: j, player };
+                            break;
+                        }
+                    }
+                    if (move) break;
+                }
+            }
+        }
+    }
+
+    if (move) {
+        animating = true;
+        if (move.type === 'place') {
+            const player = move.player;
+            const arr = sidePieces[player];
+            if (arr.length > 0) {
+                const mesh = arr.shift();
+                const targetNode = nodeObjects.find(n => n.userData.index === move.index);
+                const endPos = targetNode.position.clone(); endPos.y = PIECE_REST_Y;
+                const startPos = mesh.position.clone();
+                await animateMove(mesh, startPos, endPos, 900);
+                pieceOnBoard[move.index] = mesh;
+                delete mesh.userData.isSidePiece;
+                updateInteractiveList();
+                Sound.place();
+            }
+        } else if (move.type === 'move') {
+            const mesh = pieceOnBoard[move.src];
+            if (mesh) {
+                const startNode = nodeObjects.find(n => n.userData.index === move.src);
+                const endNode = nodeObjects.find(n => n.userData.index === move.dst);
+                const startPos = startNode.position.clone(); startPos.y = PIECE_REST_Y;
+                const endPos = endNode.position.clone(); endPos.y = PIECE_REST_Y;
+                await animateMove(mesh, startPos, endPos, 800);
+                pieceOnBoard[move.dst] = mesh;
+                delete pieceOnBoard[move.src];
+                Sound.move();
+            }
+        }
+        animating = false;
+    }
+
     await refreshState();
     if (needsAiTurn()) setTimeout(() => aiAutoPlay(), 800);
 }
 
+// ---- Réinitialisations ----
 function resetAll() {
-    // Nettoyer les pions
     for (const idx in pieceOnBoard) {
         const mesh = pieceOnBoard[idx];
         if (mesh) scene.remove(mesh);
@@ -465,11 +592,11 @@ function resetAll() {
     selectedPiece = null;
     state = null;
     validMoves = [];
+    removeWinLine();
     updateHighlights();
 }
 
 function resetGameVisuals() {
-    // Remettre tous les pions en réserve
     for (const idx in pieceOnBoard) {
         const mesh = pieceOnBoard[idx];
         const player = mesh.userData.player;
@@ -478,7 +605,6 @@ function resetGameVisuals() {
     }
     pieceOnBoard = {};
 
-    // Recréer les pions de côté si manquants (normalement 3 chacun)
     for (const player of ['X', 'O']) {
         while (sidePieces[player].length < 3) {
             const mesh = createPiece(player);
@@ -494,6 +620,7 @@ function resetGameVisuals() {
     selectedPiece = null;
     state = null;
     validMoves = [];
+    removeWinLine();
     updateInteractiveList();
     updateHighlights();
 }

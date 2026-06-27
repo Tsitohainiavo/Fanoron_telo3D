@@ -1,17 +1,30 @@
 import * as THREE from 'three';
 
 export const PLANK_THICKNESS = 0.15;
-export const PIECE_REST_Y = 0.05;   // moitié hauteur pion (0.1/2)
-export const SIDE_PIECE_Y = 0.02;   // hauteur des pions sur les supports
+export const PIECE_REST_Y = 0.05;
+// Les pions de réserve sont posés sur la table (dessus à y = -0.15)
+export const SIDE_Y = -0.15 + PIECE_REST_Y; // -0.10
 
-// Positions des 3 emplacements de chaque côté (X et O)
-// X à gauche (x négatif), O à droite (x positif), espacés en Z
 export const SIDE_POSITIONS = {
-    X: [new THREE.Vector3(-2.4, SIDE_PIECE_Y, -0.7), new THREE.Vector3(-2.4, SIDE_PIECE_Y, 0), new THREE.Vector3(-2.4, SIDE_PIECE_Y, 0.7)],
-    O: [new THREE.Vector3(2.4, SIDE_PIECE_Y, -0.7), new THREE.Vector3(2.4, SIDE_PIECE_Y, 0), new THREE.Vector3(2.4, SIDE_PIECE_Y, 0.7)]
+    X: [
+        new THREE.Vector3(-2.4, SIDE_Y, -0.7),
+        new THREE.Vector3(-2.4, SIDE_Y, 0),
+        new THREE.Vector3(-2.4, SIDE_Y, 0.7)
+    ],
+    O: [
+        new THREE.Vector3(2.4, SIDE_Y, -0.7),
+        new THREE.Vector3(2.4, SIDE_Y, 0),
+        new THREE.Vector3(2.4, SIDE_Y, 0.7)
+    ]
 };
 
-// Texture marbre
+export const WINNING_LINES = [
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6]
+];
+
+// --- Texture marbre ---
 function createMarbleTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
@@ -48,7 +61,6 @@ const marbleTex = createMarbleTexture();
 const boardMat = new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.3, metalness: 0.2 });
 const lineMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.3 });
 
-// Plateau principal
 export function createBoard() {
     const group = new THREE.Group();
 
@@ -64,7 +76,6 @@ export function createBoard() {
         }
     }
 
-    // Marqueurs de clic invisibles + surbrillances
     const markerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.02, 8);
     const markerMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0, transparent: true, opacity: 0.0 });
     const highlightGeo = new THREE.RingGeometry(0.28, 0.35, 32);
@@ -88,7 +99,6 @@ export function createBoard() {
         group.add(highlight);
     });
 
-    // Lignes
     const lineGeo = new THREE.CylinderGeometry(0.03, 0.03, 1, 8);
     const edges = [
         [0,1],[1,2],[0,3],[3,6],[6,7],[7,8],[2,5],[5,8],
@@ -111,25 +121,10 @@ export function createBoard() {
     return group;
 }
 
-// Petits socles décoratifs pour les pions de côté
-export function createSideStands() {
-    const group = new THREE.Group();
-    const standGeo = new THREE.CylinderGeometry(0.28, 0.3, 0.08, 16);
-    const standMat = new THREE.MeshStandardMaterial({ color: 0x2a1e1a, roughness: 0.6, metalness: 0.2 });
-
-    for (const player of ['X', 'O']) {
-        SIDE_POSITIONS[player].forEach(pos => {
-            const stand = new THREE.Mesh(standGeo, standMat);
-            stand.position.set(pos.x, pos.y - 0.03, pos.z);
-            stand.receiveShadow = true;
-            group.add(stand);
-        });
-    }
-    return group;
-}
-
-// Pion hexagonal
+// Pion hexagonal avec hitbox élargie pour le clic
 const pieceGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 6);
+const hitGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 6); // plus large, transparent
+
 export function createPiece(player) {
     const color = player === 'X' ? 0xcd7f32 : 0xc0c0c0;
     const mat = new THREE.MeshStandardMaterial({
@@ -144,5 +139,25 @@ export function createPiece(player) {
     piece.receiveShadow = true;
     piece.userData.player = player;
     piece.rotation.y = Math.random() * Math.PI;
+
+    // Hitbox invisible
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 });
+    const hitBox = new THREE.Mesh(hitGeo, hitMat);
+    hitBox.userData.isHitBox = true;
+    piece.add(hitBox);
+
     return piece;
+}
+
+// Ligne de victoire lumineuse
+export function createWinLine(startPos, endPos) {
+    const dir = new THREE.Vector3().subVectors(endPos, startPos);
+    const length = dir.length();
+    const mid = startPos.clone().add(endPos).multiplyScalar(0.5);
+    const geo = new THREE.CylinderGeometry(0.04, 0.04, length, 8);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffd700, emissive: 0xffd700, emissiveIntensity: 1.5 });
+    const line = new THREE.Mesh(geo, mat);
+    line.position.copy(mid);
+    line.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    return line;
 }
