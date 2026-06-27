@@ -110,3 +110,6 @@ export function createPiece(player) {
     piece.rotation.y = Math.random() * Math.PI;
     return piece;
 }
+
+export const PLANK_THICKNESS = 0.15;
+export const PIECE_REST_Y = 0.05;
