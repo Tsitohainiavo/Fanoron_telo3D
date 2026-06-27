@@ -1,5 +1,6 @@
 import { initScene, animate, scene } from './scene3d.js';
-import { createBoard, createPiece } from './board.js';
+import { createBoard, createPiece, PIECE_REST_Y } from './board.js';
+import { createRoom } from './room.js';
 import { setupInteraction, setNodeObjects } from './interactions.js';
 
 // ---------- LOG VISUEL ----------
@@ -30,6 +31,12 @@ let animating = false;
 
 // ---- Initialisation scène ----
 initScene();
+
+// La pièce (sol, murs, fenêtre, table...) est ajoutée AVANT le plateau :
+// son dessus de table affleure exactement le dessous du plateau (voir
+// room.js), c'est ce qui fait que le plateau a maintenant l'air posé.
+scene.add(createRoom());
+
 boardGroup = createBoard();
 scene.add(boardGroup);
 nodeObjects = boardGroup.children.filter(c => c.userData.isNode);
@@ -64,7 +71,7 @@ function waitForEel() {
 }
 
 async function initApp() {
-    showPageLog('Attente de l’objet eel...');
+    showPageLog('Attente de l\u2019objet eel...');
     await waitForEel();
     showPageLog('✅ Eel prêt');
 
@@ -93,6 +100,10 @@ async function initApp() {
                     currentMode = mode;
                     await refreshState();
                     if (needsAiTurn()) aiAutoPlay();
+                } else {
+                    showPageLog('Erreur démarrage : ' + res.message);
+                    menuOverlay.style.display = 'flex';
+                    gameContainer.style.display = 'none';
                 }
             } catch (err) {
                 showPageLog('Erreur start_game : ' + err.message);
@@ -174,7 +185,9 @@ function animatePieceTo(mesh, targetPos, duration = 500) {
             const easeT = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
             mesh.position.x = startPos.x + (targetPos.x - startPos.x) * easeT;
             mesh.position.z = startPos.z + (targetPos.z - startPos.z) * easeT;
-            const arc = 0.6 * Math.sin(easeT * Math.PI);
+            // Petit arc pendant le déplacement, mais on retombe pile sur
+            // targetPos.y à la fin (= posé sur le plateau, pas flottant)
+            const arc = 0.45 * Math.sin(easeT * Math.PI);
             mesh.position.y = startPos.y + (targetPos.y - startPos.y) * easeT + arc;
             if (t < 1.0) {
                 requestAnimationFrame(step);
@@ -200,12 +213,15 @@ async function updatePiecesDisplay() {
         const player = state.board[i];
         if (!player) continue;
         const targetPos = nodeObjects[i].position.clone();
-        targetPos.y += 0.18; // hauteur au-dessus du plateau
+        // PIECE_REST_Y : la moitié de la hauteur du pion, pour que sa
+        // face inférieure touche exactement la surface du plateau (y=0)
+        // au lieu de flotter au-dessus.
+        targetPos.y = PIECE_REST_Y;
 
         if (!pieceMeshes[i]) {
             const piece = createPiece(player);
             const startX = player === 'X' ? -2.2 : 2.2;
-            piece.position.set(startX, 0.2, 0);
+            piece.position.set(startX, PIECE_REST_Y + 0.15, 0);
             scene.add(piece);
             pieceMeshes[i] = piece;
             animating = true;
@@ -275,7 +291,7 @@ async function onNodeClick(index) {
     if (state.phase === 'mouvement') {
         if (selectedPiece === null) {
             if (state.board[index] !== state.current_player) {
-                showPageLog('Ce n’est pas votre pion');
+                showPageLog('Ce n\u2019est pas votre pion');
                 return;
             }
             selectedPiece = index;

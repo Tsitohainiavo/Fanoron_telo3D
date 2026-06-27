@@ -1,29 +1,38 @@
 """
-Heuristique d'évaluation pour Fanoron-telo.
+Heuristique d'évaluation pour Fanoron-telo, basée sur les bitboards.
+
+Compter les pions sur une ligne gagnante revient à faire un ET binaire
+entre le bitboard du joueur et le masque de la ligne, puis un popcount
+(bin(...).count('1')) — beaucoup plus rapide que de boucler sur une liste
+Python à chaque appel, ce qui compte quand cette fonction est appelée à
+chaque feuille de l'arbre minimax / alpha-bêta.
 """
 
-from core.plateau import LIGNES_GAGNANTES
+from core.plateau import LIGNES_MASKS
+
+
+def _popcount(n):
+    return bin(n).count('1')
+
 
 def evaluate(engine, player):
     """
-    Évalue la position pour `player` (valeur élevée = favorable).
-    Calcule un score basé sur le nombre d'alignements potentiels.
+    Évalue la position pour `player` (score élevé = favorable à `player`).
     """
     if engine.winner == player:
         return 10000
     if engine.winner is not None:
         return -10000
 
-    score = 0
-    opponent = 'O' if player == 'X' else 'X'
+    mes_bits = engine.x_bits if player == 'X' else engine.o_bits
+    bits_adverses = engine.o_bits if player == 'X' else engine.x_bits
 
-    for line in LIGNES_GAGNANTES:
-        pieces = [engine.board[i] for i in line]
-        p_cnt = pieces.count(player)
-        o_cnt = pieces.count(opponent)
+    score = 0
+    for masque in LIGNES_MASKS:
+        p_cnt = _popcount(mes_bits & masque)
+        o_cnt = _popcount(bits_adverses & masque)
 
         if o_cnt == 0:
-            # Ligne libre pour nous
             if p_cnt == 1:
                 score += 10
             elif p_cnt == 2:
@@ -34,10 +43,12 @@ def evaluate(engine, player):
             elif o_cnt == 2:
                 score -= 120   # menace de victoire adverse
 
-    # Bonus de mobilité (phase mouvement)
+    # Bonus de mobilité (utile surtout en phase mouvement)
     if engine.phase == 'mouvement':
+        opponent = 'O' if player == 'X' else 'X'
         my_moves = len(engine.get_valid_moves())
-        # Changer temporairement de joueur pour évaluer l'adversaire
+        # Bascule temporaire pour évaluer la mobilité adverse, puis on
+        # restaure : sans danger, c'est le même appel synchrone.
         engine.current_player = opponent
         opp_moves = len(engine.get_valid_moves())
         engine.current_player = player

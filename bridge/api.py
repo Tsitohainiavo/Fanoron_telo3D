@@ -2,6 +2,9 @@ from core.moteur import FanoronteloEngine
 from ia.minimax import get_best_move as minimax_move
 from ia.alphabeta import get_best_move as alphabeta_move
 
+DIFFICULTY_DEPTHS = {'easy': 2, 'medium': 4, 'hard': 6}
+
+
 class GameAPI:
     def __init__(self):
         self.engine = FanoronteloEngine()
@@ -15,22 +18,32 @@ class GameAPI:
         self.engine.reset()
         self.mode = mode
         self.difficulty = difficulty
+        self.ai_player = None
+        self.ai1 = None
+        self.ai2 = None
         print(f"[GameAPI] Nouvelle partie : mode={mode}, difficulty={difficulty}")
 
         if mode == 'pvp':
             return {'status': 'started', 'current_player': 'X'}
+
         elif mode == 'pve':
-            self.ai_player = 'O'
-            if difficulty in ['easy', 'medium', 'hard']:
-                return {'status': 'started', 'current_player': 'X'}
-            else:
+            if difficulty not in DIFFICULTY_DEPTHS:
+                # On annule l'état : pas question de laisser une partie
+                # "pve" démarrée avec une difficulté invalide, ça faisait
+                # planter le premier appel IA (KeyError sur self.difficulty).
+                self.mode = None
                 return {'status': 'error', 'message': 'Difficulté invalide'}
+            self.ai_player = 'O'
+            return {'status': 'started', 'current_player': 'X'}
+
         elif mode == 'demo':
             self.ai_player = None
             self.ai1 = ('X', 'minimax', 'medium')
             self.ai2 = ('O', 'alphabeta', 'hard')
             return {'status': 'started', 'current_player': 'X'}
+
         else:
+            self.mode = None
             return {'status': 'error', 'message': 'Mode inconnu'}
 
     def get_state(self):
@@ -52,9 +65,9 @@ class GameAPI:
             print("[GameAPI] IA va jouer (appel direct)...")
             return self._ai_play()
 
-        # Sinon, c'est un coup humain → vérifier les droits
+        # Sinon, c'est un coup humain -> vérifier les droits
         if self.mode == 'demo':
-            return {'error': 'Mode démo, pas d intervention humaine'}
+            return {'error': "Mode démo : pas d'intervention humaine"}
         if self.mode == 'pve' and self.engine.current_player == self.ai_player:
             return {'error': "C'est au tour de l'IA"}
 
@@ -85,19 +98,20 @@ class GameAPI:
             return self.get_state()
 
         if self.mode == 'pve':
-            depth = {'easy': 2, 'medium': 4, 'hard': 6}[self.difficulty]
-            if self.difficulty == 'hard':
-                move = alphabeta_move(self.engine.copy(), depth)
-            else:
-                move = minimax_move(self.engine.copy(), depth)
+            depth = DIFFICULTY_DEPTHS[self.difficulty]
+            algo = alphabeta_move if self.difficulty == 'hard' else minimax_move
+            # copy_for_search() : copie sans historique, beaucoup plus
+            # rapide que l'ancien engine.copy() (deepcopy de tout l'objet).
+            move = algo(self.engine.copy_for_search(), depth)
+
         elif self.mode == 'demo':
-            player = self.engine.current_player
-            if player == 'X':
-                # IA1 : minimax moyen
-                move = minimax_move(self.engine.copy(), 4)
+            joueur = self.engine.current_player
+            if joueur == 'X':
+                _, _, diff = self.ai1
+                move = minimax_move(self.engine.copy_for_search(), DIFFICULTY_DEPTHS[diff])
             else:
-                # IA2 : alphabeta difficile
-                move = alphabeta_move(self.engine.copy(), 6)
+                _, _, diff = self.ai2
+                move = alphabeta_move(self.engine.copy_for_search(), DIFFICULTY_DEPTHS[diff])
         else:
             return self.get_state()
 
