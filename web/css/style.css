@@ -81,3 +81,56 @@ body { background: #0a0a0a; font-family: 'Segoe UI', sans-serif; overflow: hidde
 }
 .hud-btn:hover, .back-btn:hover { background: rgba(255,255,255,0.2); }
 .hud-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Message "À vous de jouer" / "IA réfléchit" */
+#turn-message {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(5px);
+  color: #fff;
+  padding: 0.6rem 2rem;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  z-index: 6;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+/* Overlay de victoire */
+#victory-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10,10,10,0.85);
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  flex-direction: column;
+}
+.victory-text {
+  font-size: 4rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 30px #ffd700, 0 0 60px #ffd700;
+  margin-bottom: 1rem;
+}
+.victory-sub {
+  color: #ccc;
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+}
+.victory-btn {
+  padding: 0.8rem 2.5rem;
+  font-size: 1.3rem;
+  background: #0ff;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  color: #000;
+  font-weight: 700;
+  transition: 0.2s;
+}
+.victory-btn:hover { background: #0cc; }

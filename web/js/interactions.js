@@ -5,29 +5,44 @@ let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
 let nodeObjects = [];
 let clickHandler = null;
+let hoverHandler = null;
 
-export function setupInteraction(callback) {
-    clickHandler = callback;
+export function setupInteraction(onClick, onHover = null) {
+    clickHandler = onClick;
+    hoverHandler = onHover;
     window.addEventListener('click', onMouseClick);
+    if (hoverHandler) {
+        window.addEventListener('mousemove', onMouseMove);
+    }
 }
 
 function onMouseClick(event) {
     const container = document.getElementById('game-container');
     if (container.style.display === 'none') return;
-
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(nodeObjects);
     if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        if (obj.userData.isNode) {
-            clickHandler(obj.userData.index);
-        }
+        clickHandler(intersects[0].object);
+    } else {
+        clickHandler(null);
     }
 }
 
-export function setNodeObjects(nodes) {
-    nodeObjects = nodes;
+function onMouseMove(event) {
+    if (!hoverHandler) return;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(nodeObjects);
+    if (intersects.length > 0) {
+        hoverHandler(intersects[0].object);
+    } else {
+        hoverHandler(null);
+    }
+}
+
+export function setNodeObjects(objects) {
+    nodeObjects = objects;
 }

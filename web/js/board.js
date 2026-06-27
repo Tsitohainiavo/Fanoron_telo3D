@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 
-// --- Texture marbre sombre (identique) ---
+export const PLANK_THICKNESS = 0.15;
+export const PIECE_REST_Y = 0.05;   // moitié hauteur pion (0.1/2)
+export const SIDE_PIECE_Y = 0.02;   // hauteur des pions sur les supports
+
+// Positions des 3 emplacements de chaque côté (X et O)
+// X à gauche (x négatif), O à droite (x positif), espacés en Z
+export const SIDE_POSITIONS = {
+    X: [new THREE.Vector3(-2.4, SIDE_PIECE_Y, -0.7), new THREE.Vector3(-2.4, SIDE_PIECE_Y, 0), new THREE.Vector3(-2.4, SIDE_PIECE_Y, 0.7)],
+    O: [new THREE.Vector3(2.4, SIDE_PIECE_Y, -0.7), new THREE.Vector3(2.4, SIDE_PIECE_Y, 0), new THREE.Vector3(2.4, SIDE_PIECE_Y, 0.7)]
+};
+
+// Texture marbre
 function createMarbleTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
@@ -35,18 +46,14 @@ function createMarbleTexture() {
 
 const marbleTex = createMarbleTexture();
 const boardMat = new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.3, metalness: 0.2 });
-
 const lineMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.3 });
 
-// Repères de clic (invisibles)
-const markerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.02, 8);
-const markerMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0, transparent: true, opacity: 0.0 });
-
+// Plateau principal
 export function createBoard() {
     const group = new THREE.Group();
 
-    const plank = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 2.8), boardMat);
-    plank.position.y = -0.075;
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(2.8, PLANK_THICKNESS, 2.8), boardMat);
+    plank.position.y = -PLANK_THICKNESS / 2;
     plank.receiveShadow = true; plank.castShadow = true;
     group.add(plank);
 
@@ -57,6 +64,12 @@ export function createBoard() {
         }
     }
 
+    // Marqueurs de clic invisibles + surbrillances
+    const markerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.02, 8);
+    const markerMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0, transparent: true, opacity: 0.0 });
+    const highlightGeo = new THREE.RingGeometry(0.28, 0.35, 32);
+    const highlightMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00aaaa, emissiveIntensity: 0.7, side: THREE.DoubleSide });
+
     positions.forEach((pos, i) => {
         const marker = new THREE.Mesh(markerGeo, markerMat);
         marker.position.copy(pos);
@@ -65,8 +78,17 @@ export function createBoard() {
         marker.userData.isNode = true;
         marker.name = 'node';
         group.add(marker);
+
+        const highlight = new THREE.Mesh(highlightGeo, highlightMat);
+        highlight.position.copy(pos);
+        highlight.position.y = 0.09;
+        highlight.rotation.x = -Math.PI / 2;
+        highlight.visible = false;
+        marker.userData.highlight = highlight;
+        group.add(highlight);
     });
 
+    // Lignes
     const lineGeo = new THREE.CylinderGeometry(0.03, 0.03, 1, 8);
     const edges = [
         [0,1],[1,2],[0,3],[3,6],[6,7],[7,8],[2,5],[5,8],
@@ -89,11 +111,26 @@ export function createBoard() {
     return group;
 }
 
-// Pion hexagonal plat
-const pieceGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 6);  // rayon 0.25, hauteur 0.1, 6 côtés
+// Petits socles décoratifs pour les pions de côté
+export function createSideStands() {
+    const group = new THREE.Group();
+    const standGeo = new THREE.CylinderGeometry(0.28, 0.3, 0.08, 16);
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x2a1e1a, roughness: 0.6, metalness: 0.2 });
 
+    for (const player of ['X', 'O']) {
+        SIDE_POSITIONS[player].forEach(pos => {
+            const stand = new THREE.Mesh(standGeo, standMat);
+            stand.position.set(pos.x, pos.y - 0.03, pos.z);
+            stand.receiveShadow = true;
+            group.add(stand);
+        });
+    }
+    return group;
+}
+
+// Pion hexagonal
+const pieceGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 6);
 export function createPiece(player) {
-    // Couleurs assorties : bronze pour X, argent pour O
     const color = player === 'X' ? 0xcd7f32 : 0xc0c0c0;
     const mat = new THREE.MeshStandardMaterial({
         color: color,
@@ -106,10 +143,6 @@ export function createPiece(player) {
     piece.castShadow = true;
     piece.receiveShadow = true;
     piece.userData.player = player;
-    // Légère rotation aléatoire pour que les hexagones ne soient pas tous alignés
     piece.rotation.y = Math.random() * Math.PI;
     return piece;
 }
-
-export const PLANK_THICKNESS = 0.15;
-export const PIECE_REST_Y = 0.05;
