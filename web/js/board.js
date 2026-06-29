@@ -2,8 +2,7 @@ import * as THREE from 'three';
 
 export const PLANK_THICKNESS = 0.15;
 export const PIECE_REST_Y = 0.05;
-// Les pions de réserve sont posés sur la table (dessus à y = -0.15)
-export const SIDE_Y = -0.15 + PIECE_REST_Y; // -0.10
+export const SIDE_Y = -0.15 + PIECE_REST_Y;
 
 export const SIDE_POSITIONS = {
     X: [
@@ -24,28 +23,28 @@ export const WINNING_LINES = [
     [0,4,8], [2,4,6]
 ];
 
-// --- Texture marbre ---
 function createMarbleTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#2a2a2a';
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = '#444444'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#555555'; ctx.lineWidth = 1.5;
     for (let i=0;i<80;i++) {
         ctx.beginPath();
         ctx.moveTo(Math.random()*512, Math.random()*512);
         ctx.bezierCurveTo(Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512);
         ctx.stroke();
     }
-    ctx.strokeStyle = '#777777'; ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#888888'; ctx.lineWidth = 2.5;
     for (let i=0;i<15;i++) {
         ctx.beginPath();
         ctx.moveTo(Math.random()*512, Math.random()*512);
         ctx.bezierCurveTo(Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512,Math.random()*512);
         ctx.stroke();
     }
-    ctx.strokeStyle = '#333333'; ctx.lineWidth = 2;
+    // Cercles pour les cases
+    ctx.strokeStyle = '#444444'; ctx.lineWidth = 2;
     for (let row=0; row<3; row++) {
         for (let col=0; col<3; col++) {
             const x = 85 + col*170, y = 85 + row*170;
@@ -58,8 +57,8 @@ function createMarbleTexture() {
 }
 
 const marbleTex = createMarbleTexture();
-const boardMat = new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.3, metalness: 0.2 });
-const lineMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.3 });
+const boardMat = new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.6, metalness: 0.05 }); // moins réfléchissant
+const lineMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.1 });
 
 export function createBoard() {
     const group = new THREE.Group();
@@ -121,18 +120,18 @@ export function createBoard() {
     return group;
 }
 
-// Pion hexagonal avec hitbox élargie pour le clic
+// Pion (inchangé)
 const pieceGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.1, 6);
-const hitGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 6); // plus large, transparent
+const hitGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 6);
 
 export function createPiece(player) {
     const color = player === 'X' ? 0xcd7f32 : 0xc0c0c0;
     const mat = new THREE.MeshStandardMaterial({
         color: color,
         roughness: 0.3,
-        metalness: 0.8,
-        emissive: new THREE.Color(color).multiplyScalar(0.15),
-        emissiveIntensity: 0.5
+        metalness: 0.6,
+        emissive: new THREE.Color(color).multiplyScalar(0.1),
+        emissiveIntensity: 0.3
     });
     const piece = new THREE.Mesh(pieceGeo, mat);
     piece.castShadow = true;
@@ -140,7 +139,6 @@ export function createPiece(player) {
     piece.userData.player = player;
     piece.rotation.y = Math.random() * Math.PI;
 
-    // Hitbox invisible
     const hitMat = new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 });
     const hitBox = new THREE.Mesh(hitGeo, hitMat);
     hitBox.userData.isHitBox = true;
@@ -149,7 +147,6 @@ export function createPiece(player) {
     return piece;
 }
 
-// Ligne de victoire lumineuse
 export function createWinLine(startPos, endPos) {
     const dir = new THREE.Vector3().subVectors(endPos, startPos);
     const length = dir.length();

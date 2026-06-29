@@ -1,17 +1,7 @@
 /**
  * app.js — Orchestrateur principal Fanoron-telo 3D
- *
- * Améliorations :
- *  - Animation d'entrée de page d'accueil (particules + brume)
- *  - Transition fluide menu → jeu (fondu croisé)
- *  - Confettis 2D via canvas HTML (plus fluides que les cubes Three.js)
- *  - Feedback visuel "IA réfléchit" (toast + animation highlight)
- *  - Animation de caméra plus douce à chaque changement de tour
- *  - Correction bug : undo/redo re-synchronise correctement l'état visuel
- *  - Correction bug : sélection de pion annulée si on clique ailleurs
- *  - Highlights animés (pulse) sur les destinations valides
- *  - Pulsation de la ligne de victoire
- *  - Nettoyage complet de scène sans fuites mémoire
+ * avec gestion du premier joueur aléatoire, correction du mode démo,
+ * transitions fluides, préférences de mouvement réduit, focus-visible.
  */
 
 import * as THREE from 'three';
@@ -62,7 +52,7 @@ const confettiCanvas  = document.getElementById('confetti-canvas');
 const menuCanvas      = document.getElementById('menu-canvas');
 
 /* ══════════════════════════════════════════════════
-   PAGE D'ACCUEIL — Particules + Brume
+   PAGE D'ACCUEIL — Particules + Brume (inchangé)
    ══════════════════════════════════════════════════ */
 
 (function initMenuCanvas() {
@@ -77,7 +67,6 @@ const menuCanvas      = document.getElementById('menu-canvas');
     window.addEventListener('resize', resize);
     resize();
 
-    // Particules dorées
     particles = Array.from({ length: 60 }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
@@ -90,8 +79,6 @@ const menuCanvas      = document.getElementById('menu-canvas');
 
     function draw() {
         ctx.clearRect(0, 0, w, h);
-
-        // Fond radial sombre chaud
         const bg = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w,h) * 0.8);
         bg.addColorStop(0,   'rgba(40,20,8,0.92)');
         bg.addColorStop(0.5, 'rgba(20,10,4,0.96)');
@@ -99,7 +86,6 @@ const menuCanvas      = document.getElementById('menu-canvas');
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, w, h);
 
-        // Brume centrale ambrée
         const fog = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w * 0.45);
         fog.addColorStop(0,   'rgba(120,65,10,0.14)');
         fog.addColorStop(0.6, 'rgba(80,40,5,0.06)');
@@ -107,7 +93,6 @@ const menuCanvas      = document.getElementById('menu-canvas');
         ctx.fillStyle = fog;
         ctx.fillRect(0, 0, w, h);
 
-        // Particules
         particles.forEach(p => {
             p.x += p.vx;
             p.y += p.vy;
@@ -213,7 +198,12 @@ async function initApp() {
                     currentMode = mode;
                     _resetGameVisuals();
                     await _refreshState();
-                    if (_needsAiTurn()) _aiAutoPlay();
+                    // Si le premier joueur est l'IA (en mode pve ou demo), on déclenche l'IA
+                    if (_needsAiTurn()) {
+                        // Petit délai pour laisser le temps à l'affichage
+                        await _wait(500);
+                        _aiAutoPlay();
+                    }
                 } else {
                     _showError(res.message || 'Erreur inconnue');
                     menuOverlay.style.display = 'flex';
@@ -292,7 +282,6 @@ window.addEventListener('load', initApp);
    ══════════════════════════════════════════════════ */
 
 function onHover(obj) {
-    // Remonter à la racine si hitbox enfant
     if (obj?.parent?.userData.isSidePiece) obj = obj.parent;
     if (obj?.userData.isHitBox)             obj = obj.parent;
 }
@@ -300,9 +289,8 @@ function onHover(obj) {
 function onClick(obj) {
     if (!state || state.winner || animating) return;
     if (currentMode === 'demo') return;
-    if (currentMode === 'pve' && state.current_player === 'O') return;
+    if (currentMode === 'pve' && state.current_player === 'O') return; // l'IA joue
 
-    // Remonter à la racine (hitbox → pion)
     if (obj?.parent?.userData.isSidePiece) obj = obj.parent;
     if (obj?.userData.isHitBox)             obj = obj.parent;
 
@@ -312,7 +300,6 @@ function onClick(obj) {
         if (obj.userData.player !== state.current_player) {
             Sound.error(); return;
         }
-        // Toggle sélection
         if (selectedPiece?.mesh === obj) {
             _deselectPiece();
             return;
@@ -329,7 +316,6 @@ function onClick(obj) {
     if (obj?.userData.isNode) {
         const idx = obj.userData.index;
 
-        // Phase placement : poser un pion
         if (state.phase === 'placement' && selectedPiece?.type === 'side') {
             if (!validMoves.includes(idx)) { Sound.error(); return; }
             const { player, mesh } = selectedPiece;
@@ -339,10 +325,8 @@ function onClick(obj) {
             return;
         }
 
-        // Phase mouvement
         if (state.phase === 'mouvement') {
             if (!selectedPiece || selectedPiece.type === 'side') {
-                // Sélectionner un pion sur le plateau
                 if (state.board[idx] !== state.current_player) return;
                 if (!pieceOnBoard[idx]) return;
                 _deselectPiece();
@@ -359,7 +343,6 @@ function onClick(obj) {
                 if (src === idx) { _updateHighlights(); return; }
                 const ok = validMoves.some(m => Array.isArray(m) && m[0] === src && m[1] === idx);
                 if (!ok) {
-                    // Re-sélection ?
                     if (state.board[idx] === state.current_player && pieceOnBoard[idx]) {
                         selectedPiece = { type: 'board', index: idx, mesh: pieceOnBoard[idx] };
                         _elevate(pieceOnBoard[idx], true);
@@ -392,7 +375,6 @@ function _deselectPiece() {
     _updateHighlights();
 }
 
-/** Monte / descend légèrement un pion pour montrer qu'il est sélectionné. */
 function _elevate(mesh, up) {
     if (!mesh) return;
     const base = mesh.userData.isSidePiece ? PIECE_REST_Y : PIECE_REST_Y;
@@ -427,7 +409,7 @@ function _updateHighlights() {
 }
 
 /* ══════════════════════════════════════════════════
-   ANIMATIONS DE DÉPLACEMENT
+   ANIMATIONS DE DÉPLACEMENT (améliorées)
    ══════════════════════════════════════════════════ */
 
 function _animateMove(mesh, startPos, endPos, duration = 850) {
@@ -440,12 +422,12 @@ function _animateMove(mesh, startPos, endPos, duration = 850) {
                 : 1 - Math.pow(-2 * raw + 2, 2) / 2;
 
             mesh.position.lerpVectors(startPos, endPos, ease);
-            // Arc parabolique
             mesh.position.y = startPos.y + (endPos.y - startPos.y) * ease
                 + 0.3 * Math.sin(ease * Math.PI);
             mesh.rotation.y += 0.06;
 
-            raw < 1 ? requestAnimationFrame(step) : (mesh.position.copy(endPos), resolve());
+            if (raw < 1) requestAnimationFrame(step);
+            else { mesh.position.copy(endPos); resolve(); }
         }
         requestAnimationFrame(step);
     });
@@ -498,7 +480,6 @@ async function _executePlacement(player, mesh, targetIdx) {
     if (animating) return;
     animating = true;
 
-    // Appel serveur
     const res = await eel.make_move(targetIdx)();
     if (res.error) {
         console.warn('Placement refusé :', res.error);
@@ -506,13 +487,11 @@ async function _executePlacement(player, mesh, targetIdx) {
         return;
     }
 
-    // Retirer de la réserve
     const arr = sidePieces[player];
     const pos = arr.indexOf(mesh);
     if (pos > -1) arr.splice(pos, 1);
     delete mesh.userData.isSidePiece;
 
-    // Animer
     const targetNode = nodeObjects.find(n => n.userData.index === targetIdx);
     const endPos = targetNode.position.clone();
     endPos.y = PIECE_REST_Y;
@@ -555,7 +534,7 @@ async function _executeMove(mesh, src, dst) {
 }
 
 /* ══════════════════════════════════════════════════
-   IA AUTO-PLAY
+   IA AUTO-PLAY (corrigé pour utiliser last_move)
    ══════════════════════════════════════════════════ */
 
 async function _aiAutoPlay() {
@@ -563,7 +542,6 @@ async function _aiAutoPlay() {
     _setAiToast(true);
     Sound.thinkStart();
 
-    const oldBoard = state ? [...state.board] : null;
     let res;
     try {
         res = await eel.make_move('ai')();
@@ -573,74 +551,66 @@ async function _aiAutoPlay() {
         return;
     }
     _setAiToast(false);
-    if (res?.error) return;
+    if (res?.error) {
+        await _refreshState();
+        return;
+    }
 
-    // Détecter le coup joué par comparaison d'états
+    const move = res.last_move;
+    if (move !== undefined && move !== null) {
+        // Attendre que l'animation soit terminée
+        await _animateMoveFromAPI(move);
+    } else {
+        await _refreshState();
+    }
+
+    // Récupérer l'état après le coup
     const newState = await eel.get_state()();
-    const nb = newState.board;
-    let move = null;
-
-    if (oldBoard) {
-        // Placement ?
-        for (let i = 0; i < 9; i++) {
-            if (!oldBoard[i] && nb[i]) {
-                move = { type: 'place', index: i, player: nb[i] };
-                break;
-            }
-        }
-        // Déplacement ?
-        if (!move) {
-            for (let i = 0; i < 9; i++) {
-                if (oldBoard[i] && !nb[i]) {
-                    const pl = oldBoard[i];
-                    for (let j = 0; j < 9; j++) {
-                        if (!oldBoard[j] && nb[j] === pl) {
-                            move = { type: 'move', src: i, dst: j, player: pl };
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
+    if (newState.winner) {
+        await _refreshState();
+        return;
     }
-
-    if (move) {
-        animating = true;
-        if (move.type === 'place') {
-            const arr = sidePieces[move.player];
-            if (arr.length > 0) {
-                const mesh = arr.shift();
-                delete mesh.userData.isSidePiece;
-                const node   = nodeObjects.find(n => n.userData.index === move.index);
-                const endPos = node.position.clone(); endPos.y = PIECE_REST_Y;
-                await _animateMove(mesh, mesh.position.clone(), endPos, 950);
-                pieceOnBoard[move.index] = mesh;
-                _updateInteractiveList();
-                Sound.place();
-            }
-        } else {
-            const mesh = pieceOnBoard[move.src];
-            if (mesh) {
-                const sNode = nodeObjects.find(n => n.userData.index === move.src);
-                const eNode = nodeObjects.find(n => n.userData.index === move.dst);
-                const sp    = sNode.position.clone(); sp.y = PIECE_REST_Y;
-                const ep    = eNode.position.clone(); ep.y = PIECE_REST_Y;
-                await _animateMove(mesh, sp, ep, 850);
-                pieceOnBoard[move.dst] = mesh;
-                delete pieceOnBoard[move.src];
-                Sound.move();
-            }
-        }
-        animating = false;
-    }
-
-    await _refreshState();
-
-    // En démo, enchaîner avec un délai
     if (_needsAiTurn()) {
-        await _wait(currentMode === 'demo' ? 900 : 500);
+        // Délai pour voir le mouvement avant le prochain coup
+        const delay = currentMode === 'demo' ? 800 : 400;
+        await _wait(delay);
         _aiAutoPlay();
+    }
+}
+
+async function _animateMoveFromAPI(move) {
+    if (typeof move === 'number') {
+        // Placement
+        const board = state.board;
+        const player = board[move];
+        if (!player) return;
+        const arr = sidePieces[player];
+        if (arr.length === 0) return;
+        const mesh = arr.shift();
+        delete mesh.userData.isSidePiece;
+        const node = nodeObjects.find(n => n.userData.index === move);
+        const endPos = node.position.clone();
+        endPos.y = PIECE_REST_Y;
+        await _animateMove(mesh, mesh.position.clone(), endPos, 850);
+        pieceOnBoard[move] = mesh;
+        _updateInteractiveList();
+        Sound.place();
+        await _refreshState();
+    } else if (Array.isArray(move) && move.length === 2) {
+        const [src, dst] = move;
+        const mesh = pieceOnBoard[src];
+        if (!mesh) return;
+        const startNode = nodeObjects.find(n => n.userData.index === src);
+        const endNode = nodeObjects.find(n => n.userData.index === dst);
+        const startPos = startNode.position.clone();
+        startPos.y = PIECE_REST_Y;
+        const endPos = endNode.position.clone();
+        endPos.y = PIECE_REST_Y;
+        await _animateMove(mesh, startPos, endPos, 800);
+        pieceOnBoard[dst] = mesh;
+        delete pieceOnBoard[src];
+        Sound.move();
+        await _refreshState();
     }
 }
 
@@ -711,7 +681,7 @@ async function _syncPiecesWithState() {
 
     _updateInteractiveList();
 
-    // Invalider sélection si incohérente après sync
+    // Invalider sélection si incohérente
     if (selectedPiece) {
         if (selectedPiece.type === 'board' && !pieceOnBoard[selectedPiece.index]) {
             selectedPiece = null;
@@ -755,7 +725,6 @@ function _updateHUD() {
         undoBtn.disabled = false;
         redoBtn.disabled = false;
 
-        // Message de tour
         turnMessage.classList.remove('hidden');
         if (_needsAiTurn()) {
             turnMsgIcon.textContent = '⚙';
@@ -790,7 +759,6 @@ function _checkVictory() {
     winLine = createWinLine(p1, p2);
     scene.add(winLine);
 
-    // Pulsation de la ligne de victoire
     let t = 0;
     winLinePulse = setInterval(() => {
         t += 0.08;
@@ -818,7 +786,7 @@ function _stopWinLinePulse() {
 }
 
 /* ══════════════════════════════════════════════════
-   CONFETTIS 2D (canvas HTML — plus performant)
+   CONFETTIS 2D
    ══════════════════════════════════════════════════ */
 
 function _spawnConfetti() {
@@ -850,7 +818,7 @@ function _spawnConfetti() {
             p.y     += p.vy;
             p.x     += p.vx;
             p.angle += p.dAngle;
-            p.vy    += 0.05;  // gravité légère
+            p.vy    += 0.05;
             if (p.y < confettiCanvas.height + 20) alive = true;
             ctx.save();
             ctx.translate(p.x, p.y);
@@ -900,7 +868,6 @@ function _resetAll() {
 }
 
 function _resetGameVisuals() {
-    // Remettre tous les pions du plateau en réserve
     for (const idx in pieceOnBoard) {
         const mesh   = pieceOnBoard[idx];
         const player = mesh.userData.player;
@@ -909,7 +876,6 @@ function _resetGameVisuals() {
     }
     pieceOnBoard = {};
 
-    // S'assurer d'avoir 3 pions par joueur
     for (const player of ['X', 'O']) {
         while (sidePieces[player].length < 3) {
             const mesh = createPiece(player);
@@ -917,7 +883,6 @@ function _resetGameVisuals() {
             sidePieces[player].push(mesh);
             scene.add(mesh);
         }
-        // Couper le surplus
         while (sidePieces[player].length > 3) {
             const extra = sidePieces[player].pop();
             scene.remove(extra);
@@ -952,7 +917,6 @@ function _needsAiTurn() {
 function _wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function _showError(msg) {
-    // Toast d'erreur simple non bloquant
     const t = document.createElement('div');
     t.style.cssText = `
         position:fixed;bottom:24px;left:50%;transform:translateX(-50%);

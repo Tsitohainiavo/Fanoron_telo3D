@@ -14,11 +14,11 @@ export function initScene() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;  // baisse exposition
+  renderer.toneMappingExposure = 0.9; // plus lumineux que 0.75
   container.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a1a); // fond très sombre
+  scene.background = new THREE.Color(0x1a1a1a);
   scene.fog = new THREE.FogExp2(0x1a1a1a, 0.0003);
 
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -34,39 +34,44 @@ export function initScene() {
   controls.target.set(0, 0, 0);
   controls.update();
 
-  // Post-processing : bloom très discret
   composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.3, 0.2, 0.5);
-  bloomPass.threshold = 0.4;
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.2, 0.1, 0.5
+  );
+  bloomPass.threshold = 0.6;
   bloomPass.strength = 0.3;
-  bloomPass.radius = 0.5;
+  bloomPass.radius = 0.4;
   composer.addPass(bloomPass);
 
-  // Lumières tamisées
-  const ambient = new THREE.AmbientLight(0x444466);
+  // Lumières (inspirées de la version initiale)
+  const ambient = new THREE.AmbientLight(0x444466, 0.4);
   scene.add(ambient);
 
   // Lumière principale douce
-  const keyLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+  const keyLight = new THREE.DirectionalLight(0xffeedd, 0.7);
   keyLight.position.set(3, 6, 4);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.width = 1024;
   keyLight.shadow.mapSize.height = 1024;
-  keyLight.shadow.camera.near = 0.5;
-  keyLight.shadow.camera.far = 50;
   scene.add(keyLight);
 
   // Remplissage chaud
-  const fillLight = new THREE.PointLight(0xffaa55, 0.4, 12);
+  const fillLight = new THREE.PointLight(0xffaa55, 0.3, 12);
   fillLight.position.set(-3, 1, 3);
   scene.add(fillLight);
 
-  // Contre-jour froid très léger
-  const rimLight = new THREE.PointLight(0x99aaff, 0.3, 12);
+  // Contre-jour froid
+  const rimLight = new THREE.PointLight(0x99aaff, 0.2, 12);
   rimLight.position.set(3, 1, -4);
   scene.add(rimLight);
+
+  // Lumière de lune (très douce)
+  const moonLight = new THREE.DirectionalLight(0x8fb0ff, 0.2);
+  moonLight.position.set(-5, 8, -4);
+  scene.add(moonLight);
 
   window.addEventListener('resize', onWindowResize, false);
 }

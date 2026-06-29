@@ -1,4 +1,3 @@
-// Générateur de sons synthétiques
 let audioCtx = null;
 
 function getAudioContext() {
@@ -40,5 +39,7 @@ export const Sound = {
             osc.start(now + i * 0.15);
             osc.stop(now + i * 0.15 + 0.3);
         });
-    }
+    },
+    error: () => { playTone(200, 0.2, 'sawtooth', 0.15); },
+    thinkStart: () => { playTone(800, 0.05, 'sine', 0.05); }
 };

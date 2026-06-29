@@ -15,26 +15,31 @@
   margin: 0; padding: 0; box-sizing: border-box;
 }
 
+/* ── Thème plus chaleureux ── */
 :root {
-  --brass:   #c9a24b;
+  --brass:   #d4af37;
   --bronze:  #cd7f32;
   --silver:  #c0c0c0;
   --mahog:   #1c160f;
-  --ink:     #0d0906;
-  --ivory:   #e8d5b0;
+  --ink:     #0a0705;
+  --ivory:   #f0e2c5;
   --amber:   #ffd270;
   --glow-x:  #e6923a;
   --glow-o:  #9ab8d0;
+  --bg-menu: #0d0906;
+}
 
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
+/* Animations de transition */
+.fade-out { animation: fade-out 0.4s ease forwards; }
+.fade-in  { animation: fade-in 0.5s ease forwards; }
 
-  --font-display: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
-  --font-body:    'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-
-  --transition-fast: 0.18s ease;
-  --transition-med:  0.32s ease;
+@keyframes fade-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 html, body {
@@ -657,10 +662,37 @@ html, body {
   outline-offset: 3px;
 }
 
-/* Mouvement réduit */
+/* ── Accessibilité : préférences de mouvement réduit ── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Focus visible ── */
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+}
+
+/* ── Transitions fluides ── */
+.fade-out {
+  animation: fade-out 0.4s ease forwards;
+}
+.fade-in {
+  animation: fade-in 0.5s ease forwards;
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96); }
+}
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+

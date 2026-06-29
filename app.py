@@ -1,7 +1,6 @@
 import eel
 from bridge.api import GameAPI
 
-# Init Eel
 eel.init('web')
 
 api = GameAPI()
@@ -37,6 +36,4 @@ def redo():
     return api.redo()
 
 if __name__ == '__main__':
-    # 'default' ouvre le navigateur par défaut (Chrome, avec F12 possible)
-    # Vous pouvez aussi forcer 'chrome' si besoin, mais 'default' est plus simple pour déboguer.
     eel.start('index.html', mode='chrome', port=0, size=(1280, 800))
