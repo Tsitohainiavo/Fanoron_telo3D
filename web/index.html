@@ -3,57 +3,172 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Fanoron-telo 3D</title>
+<title>Fanoron-telo — Expérience 3D</title>
 <script type="text/javascript" src="/eel.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- Menu principal -->
+<!-- ═══════════════════════════════════════ PAGE D'ACCUEIL ═══════════════════════════════════════ -->
 <div id="menu-overlay">
-  <div class="menu-card">
-    <h1 class="game-title">FANORON<span>-TELO</span></h1>
-    <div class="subtitle">Expérience immersive 3D</div>
-    <div class="mode-select">
-      <button class="mode-btn" data-mode="pvp">👥 Humain vs Humain</button>
+  <!-- Fond animé : brume + particules dorées -->
+  <canvas id="menu-canvas"></canvas>
+  <div class="menu-vignette"></div>
+
+  <div class="menu-content">
+    <!-- Emblème central -->
+    <div class="emblem">
+      <div class="emblem-ring outer"></div>
+      <div class="emblem-ring inner"></div>
+      <svg class="emblem-grid" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+        <!-- Grille 3×3 du Fanoron-telo -->
+        <line x1="15" y1="15" x2="75" y2="15" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <line x1="15" y1="45" x2="75" y2="45" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <line x1="15" y1="75" x2="75" y2="75" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <line x1="15" y1="15" x2="15" y2="75" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <line x1="45" y1="15" x2="45" y2="75" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <line x1="75" y1="15" x2="75" y2="75" stroke="#c9a24b" stroke-width="1.5" opacity="0.8"/>
+        <!-- Diagonales -->
+        <line x1="15" y1="15" x2="75" y2="75" stroke="#c9a24b" stroke-width="1" opacity="0.5"/>
+        <line x1="75" y1="15" x2="15" y2="75" stroke="#c9a24b" stroke-width="1" opacity="0.5"/>
+        <!-- Nœuds -->
+        <circle cx="15" cy="15" r="4" fill="#c9a24b"/>
+        <circle cx="45" cy="15" r="4" fill="#c9a24b"/>
+        <circle cx="75" cy="15" r="4" fill="#c9a24b"/>
+        <circle cx="15" cy="45" r="4" fill="#c9a24b"/>
+        <circle cx="45" cy="45" r="5.5" fill="#cd7f32" stroke="#ffd270" stroke-width="1.2"/>
+        <circle cx="75" cy="45" r="4" fill="#c9a24b"/>
+        <circle cx="15" cy="75" r="4" fill="#c9a24b"/>
+        <circle cx="45" cy="75" r="4" fill="#c9a24b"/>
+        <circle cx="75" cy="75" r="4" fill="#c9a24b"/>
+      </svg>
+    </div>
+
+    <!-- Titre -->
+    <div class="title-block">
+      <div class="title-eyebrow">JEU DE STRATÉGIE MALGACHE</div>
+      <h1 class="game-title">
+        <span class="title-fan">FANORON</span><span class="title-telo">-TELO</span>
+      </h1>
+      <div class="title-rule"></div>
+      <p class="title-tagline">Trois pions. Huit lignes. Un seul vainqueur.</p>
+    </div>
+
+    <!-- Carte de sélection -->
+    <div class="menu-card">
+      <div class="card-section-label">CHOISIR UN MODE</div>
+
+      <button class="mode-btn" data-mode="pvp">
+        <span class="btn-icon">⚔</span>
+        <span class="btn-text">
+          <strong>Humain contre Humain</strong>
+          <small>Deux joueurs, un plateau</small>
+        </span>
+      </button>
+
       <div class="pve-group">
-        <button class="mode-btn" data-mode="pve">🤖 Humain vs IA</button>
-        <select id="difficulty-select" class="difficulty-select">
+        <button class="mode-btn pve-main" data-mode="pve">
+          <span class="btn-icon">🤖</span>
+          <span class="btn-text">
+            <strong>Humain contre IA</strong>
+            <small>Affrontez l'intelligence artificielle</small>
+          </span>
+        </button>
+        <select id="difficulty-select" class="difficulty-select" aria-label="Niveau de difficulté">
           <option value="easy">Facile</option>
           <option value="medium" selected>Moyen</option>
           <option value="hard">Difficile</option>
         </select>
       </div>
-      <button class="mode-btn" data-mode="demo">🎮 Démo : IA vs IA</button>
+
+      <button class="mode-btn demo-btn" data-mode="demo">
+        <span class="btn-icon">🎲</span>
+        <span class="btn-text">
+          <strong>Démo — IA contre IA</strong>
+          <small>Regardez les algorithmes s'affronter</small>
+        </span>
+      </button>
     </div>
-    <div class="info-footer">Rotate 360° | Salon feutré | Animations fluides</div>
+
+    <div class="menu-footer">
+      <span>Rotation libre 360°</span>
+      <span class="sep">·</span>
+      <span>Salon immersif 3D</span>
+      <span class="sep">·</span>
+      <span>IA Minimax &amp; Alpha-bêta</span>
+    </div>
   </div>
 </div>
 
-<!-- Zone de jeu -->
+<!-- ═══════════════════════════════════════ JEU ═══════════════════════════════════════ -->
 <div id="game-container" style="display:none;">
+
+  <!-- HUD supérieur -->
   <div id="hud">
-    <div class="player-turn" id="turn-indicator">Tour : <span>Bronze</span></div>
-    <div class="phase-badge" id="phase-badge">Placement</div>
-    <div class="action-btns">
-      <button id="undo-btn" class="hud-btn" title="Annuler">↩</button>
-      <button id="redo-btn" class="hud-btn" title="Rétablir">↪</button>
-      <button id="replay-btn" class="hud-btn" title="Rejouer" style="display:none;">🔄 Rejouer</button>
+    <div class="hud-left">
+      <button id="back-btn" class="icon-btn" title="Retour au menu" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="player-chip" id="player-chip">
+        <div class="chip-dot" id="chip-dot"></div>
+        <span id="chip-label">Bronze</span>
+      </div>
     </div>
-    <button id="back-btn" class="back-btn">← Menu</button>
+
+    <div class="hud-center">
+      <div class="phase-badge" id="phase-badge">Placement</div>
+    </div>
+
+    <div class="hud-right">
+      <button id="undo-btn" class="icon-btn" title="Annuler" aria-label="Annuler">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+      </button>
+      <button id="redo-btn" class="icon-btn" title="Rétablir" aria-label="Rétablir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+      </button>
+      <button id="replay-btn" class="icon-btn" title="Rejouer" style="display:none;" aria-label="Rejouer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.17"/></svg>
+      </button>
+    </div>
   </div>
-  <div id="turn-message">À vous de jouer !</div>
+
+  <!-- Message central bas -->
+  <div id="turn-message" aria-live="polite">
+    <div class="turn-msg-inner">
+      <span id="turn-msg-icon">●</span>
+      <span id="turn-msg-text">À vous de jouer !</span>
+    </div>
+  </div>
 </div>
 
-<!-- Overlay de victoire -->
-<div id="victory-overlay">
-  <div class="victory-text" id="victory-text"></div>
-  <div class="victory-sub">Félicitations !</div>
-  <button class="victory-btn" id="observe-btn"> Observer le plateau</button>
-  <button class="victory-btn" id="new-game-btn" style="margin-top:1rem;"> Nouvelle partie</button>
+<!-- ═══════════════════════════════════════ VICTOIRE ═══════════════════════════════════════ -->
+<div id="victory-overlay" role="dialog" aria-modal="true" aria-labelledby="victory-text">
+  <canvas id="confetti-canvas"></canvas>
+  <div class="victory-card">
+    <div class="victory-emblem">
+      <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="30" cy="30" r="28" fill="none" stroke="#c9a24b" stroke-width="1.5" opacity="0.6"/>
+        <polygon points="30,8 34,22 49,22 37,31 41,45 30,37 19,45 23,31 11,22 26,22" fill="#ffd270" opacity="0.9"/>
+      </svg>
+    </div>
+    <div class="victory-title" id="victory-text">Victoire !</div>
+    <div class="victory-winner" id="victory-winner"></div>
+    <div class="victory-actions">
+      <button class="vict-btn secondary" id="observe-btn">Observer le plateau</button>
+      <button class="vict-btn primary" id="new-game-btn">Nouvelle partie</button>
+    </div>
+  </div>
 </div>
 
-<!-- Importmap pour Three.js -->
+<!-- ═══════════════════════════════════════ TOAST IA ═══════════════════════════════════════ -->
+<div id="ai-thinking-toast" aria-live="polite">
+  <div class="toast-dots">
+    <span></span><span></span><span></span>
+  </div>
+  <span>L'IA calcule son coup…</span>
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -62,8 +177,6 @@
   }
 }
 </script>
-
 <script type="module" src="js/app.js"></script>
-
 </body>
 </html>
